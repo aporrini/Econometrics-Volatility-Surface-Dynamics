@@ -1,0 +1,11 @@
+series,adf_stat,p_value_ADF,conclusion_ADF,kpss_stat,p_value_KPSS,conclusion_KPSS,I_order
+alpha,-3.2557,0.017,I(0),1.9196,0.01,non-stat,Uncertain
+beta,-4.2404,0.0006,I(0),1.2896,0.01,non-stat,Uncertain
+rho,-4.4794,0.0002,I(0),2.7535,0.01,non-stat,Uncertain
+eta,-2.9795,0.0369,I(0),4.747,0.01,non-stat,Uncertain
+gamma,-3.3613,0.0124,I(0),5.6359,0.01,non-stat,Uncertain
+d_alpha,-56.1482,0.0,I(0),0.0367,0.1,stat,I(0)
+d_beta,-56.4259,0.0,I(0),0.0176,0.1,stat,I(0)
+d_rho,-26.3859,0.0,I(0),0.0355,0.1,stat,I(0)
+d_eta,-32.4317,0.0,I(0),0.0499,0.1,stat,I(0)
+d_gamma,-32.1829,0.0,I(0),0.0568,0.1,stat,I(0)
