@@ -662,7 +662,7 @@ This project demonstrates that SSVI-parametrised implied volatility surfaces car
 
 1. **SSVI is robust:** 96.3% calibration success, sub-1% RMSE_iv, zero calendar arbitrage violations across 10 years.
 2. **Panel FE is the right specification:** Hausman test confirms random effects are inconsistent; Day+Maturity FE achieves R² = 0.831 with 1.81M observations.
-3. **VAR > ARMA for shape parameters:** Cross-parameter predictability in (ρ, η, γ) is strong; VAR(3) achieves MSE ratios of 0.001–0.003.
+3. **ARMA beats random walk for shape parameters:** ARMA(1,4) on γ achieves MSE ratio = 0.886 and ARMAX further reduces it to 0.879; VAR results pending rerun after correction of a baseline bug (previous MSE ratios of 0.001–0.003 were artifacts of a zero baseline, not a random walk).
 4. **Regime-augmented HAR dominates:** F3_VIX (HAR + log_VIX + VIX-regime interaction) achieves R²_OOS = 0.861 at h=5, +4.5 pp over pure HAR3 (DM p < 0.01). The regime cutoff VIX > Q75 = 18.40% captures distinct vol dynamics: in high-VIX states, the surface-level signal amplifies non-linearly.
 5. **β and η are the key SSVI predictors:** The term-structure slope (β) dominates all SSVI features in regularized models; η (vol-of-vol proxy) adds information in the generic framework when VVIX is not available.
 
@@ -705,7 +705,7 @@ The most important finding with potential publication value is the **Granger-cau
 | NB03 | Within-transformation FE avoids 37.5 GB dummy matrix; `_FEResult` wrapper |
 | NB03 | `OptionType` absorption in Hausman test (each contract is always call or put) |
 | NB04 | GARCH `.dropna()` bug: `std_resid` is numpy array, not pandas Series |
-| NB07/08 | Path bug: `'../output/'` resolved to old 252-day data; fixed to `Notebook_newdata/output/` |
+| NB07/08 | Path bug: `'../output/'` resolved to incorrect data directory; fixed to `output/` relative to the project root |
 | NB09 | SSVI path bug + END date cut at 2018; extended to 2020-12-31 with COVID analysis |
 
 ---
