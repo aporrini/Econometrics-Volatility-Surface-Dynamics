@@ -1,7 +1,7 @@
 # SSVI Volatility Surface Dynamics — Extended Dataset (2010–2020)
 
-**Politecnico di Milano — Econometrics Project (A.Y. 2024/25)**
-Authors: Alessio Porrini et al.
+**Politecnico di Milano — Econometrics Project (A.Y. 2025/26)**
+Authors: Alessio Porrini, Marco Amarilli, Camilla Introzzi, Christian Frigerio
 
 ---
 
