@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # SSVI Volatility Surface Dynamics — Extended Dataset (2010–2020)
 
 **Politecnico di Milano — Econometrics Project (A.Y. 2024/25)**
@@ -235,6 +234,3 @@ Same as `merged_notebook_final/README.md`, with the addition of:
   (also) is path-dependent. Working paper (arXiv v3, 2025).
 - **Fontana, M., Zeni, G. & Vantini, S. (2023)**. Conformal Prediction: a Unified
   Review of Theory and New Challenges. *Bernoulli*, 29(1), 1–23. (Polimi MOX)
-=======
-# Econometrics-Volatility-Surface-Dynamics
->>>>>>> 28067b75a21d3f89ec68f4d5c68a8c65c17052de
