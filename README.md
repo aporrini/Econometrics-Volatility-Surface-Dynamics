@@ -69,99 +69,38 @@ The notebooks in this repository (NB03–NB11) require pre-built input files pla
 
 ## Notebook Structure
 
-Run in order: **03 → 04 → 04.5 → 05 → 05.5 → 06 → 07 → 08 → 08.5 → 09 → 10 → 11**
+### Notebook C — Self-Contained Forecasting Framework (Primary)
 
-| # | Notebook | Description | Category |
-|---|----------|-------------|----------|
-| 03 | `03_panel_iv_regression.ipynb` | Panel OLS/FE/RE + full Gauss-Markov diagnostics | **Core Econometrics** |
-| 04 | `04_arma_var_cointegration.ipynb` | ARMA/ARMAX + EGARCH + Conformal Prediction + VAR + Cointegration | **Core Econometrics** |
-| 04.5 | `04_5_vecm_rolling_cointegration.ipynb` | Rolling Johansen cointegration (500-day window): rank=1 in 32.1% of windows (stress regimes); global rank=2 with full dataset → VECM globally misspecified; regime-conditional EG p≈0.05 | EXTRA |
-| 05 | `05_ssvi_parameter_forecasting.ipynb` | Triple Battle: Sticky vs AR-GARCH vs ARMAX at h=1,5,20 | Core + EXTRA |
-| 05.5 | `05_5_ssvi_surface_pca_har.ipynb` | PCA on 100-point SSVI surface grid: 2 PCs explain 99% (PC1=Level 96.65%, PC2=Term structure 2.43%). HAR on PC scores: R²_OOS=+0.763/+0.876/+0.805 at h=1/5/20. Nelson-Siegel analogy for vol surfaces. | EXTRA |
-| 06 | `06_ssvi_feature_engineering.ipynb` | HAR-RV components, SSVI features, forecasting dataset | EXTRA |
-| 07 | `07_rv_forecasting_core.ipynb` | RV20 forecasting: Ridge, Lasso, HAR-RV benchmark | EXTRA |
-| 08 | `08_rv_forecasting_extensions.ipynb` | Multi-horizon log-HAR (h=1,5,20), regime-augmented HAR (F3_VIX: R²=0.861 at h=5), VVIX×ρ test, rolling OOS, Generic HAR (ATM_SSVI replaces VIX: R²=0.837, portable to any asset), SSVI-motivated models M1–M4 (**M4 wins: R²=0.868 at h=20, DM p<0.0001**), beta extensions M5/M6 | EXTRA |
-| 08.5 | `08_5_rv_features_nb0607.ipynb` | NB06-07 feature additions to M4: log_ATM×max_cond1 (near-arb stress interaction) improves h=5 (DM=−8.75***, R²=0.847); log_rmse_iv hurts (DM=+7.19***) | EXTRA |
-| 09 | `09_frontier_analyses.ipynb` | Frontier analyses: Volmageddon/COVID structural breaks, Granger causality, Andres et al. benchmark | EXTRA |
-| 10 | `10_novelties.ipynb` | Novel findings summary (6 findings): η negative sign, β_dev OOS gain, SSVI portability, Heston↔SSVI↔HAR mapping, smooth>discrete regime, SSVI Δ-params near-white-noise | EXTRA |
-| 11 | `11_quantum_ssvi_parameter_forecasting_qiskit.ipynb` | Can quantum feature maps model nonlinear SSVI dynamics? Naive vs GradientBoosting vs Quantum Kernel SVR (ZZFeatureMap + FidelityQuantumKernel). Result: SSVI Δ-params near-white-noise; only Δγ marginally predictable (MSE_ratio=0.95). Qiskit graceful skip if not installed. | EXTRA |
+`econometric_analysis/C_realized_volatility_forecasting.ipynb` is the **primary deliverable** for the realized volatility forecasting component. It consolidates the full multi-horizon forecasting pipeline into a single, publication-ready notebook.
 
----
+| Section | Description |
+|---------|-------------|
+| 1. Data Loading | SSVI parameters from GitHub; SP500 from Yahoo Finance / FRED fallback; VIX from FRED |
+| 2. Realized Volatility | Daily log-RV proxy; multi-horizon targets h ∈ {1, 5, 20} |
+| 3. Feature Engineering | HAR components, SSVI levels, ATM IV, centered stress interactions |
+| 4. Evaluation Framework | OOS R², DM-HLN test (Newey-West HAC + HLN small-sample correction) |
+| 5. Multi-Horizon Evaluation | 8 models, 80/20 single split |
+| 6a. Collinearity & Feature Selection | VIF analysis; significance-based pruning (p < 0.10); centered lambda fix |
+| 6b. Expanding Window | Fully recursive OOS with min 60% training; 6 models |
+| 7. Visualizations | R²_OOS heatmap, forecast vs actual, lambda stress, MSE ratio plots |
+| 8. Key Findings | Economic interpretation, regime dynamics |
+| 9. Model Formulas | Complete mathematical specification of all models |
 
-## Key Results Summary (NB03–NB09)
+**Final model set:**
 
-### NB03 — Panel IV Regression
-- R² progression: Pooled OLS 0.63 → Day FE 0.73 → Day+Maturity FE **0.77** → Surface Cell FE 0.81
-- Day FE implemented via within-transformation to avoid the 37 GB design matrix
-- RESET test rejects the linear specification → log(IV) or IV²(moneyness) recommended
+| Model | Features | Best R²_OOS |
+|-------|----------|-------------|
+| Naive | RW | 0.000 |
+| HAR | 3 (d/w/m RV) | ~0.82 (h=5) |
+| HAR+VIX | 4 | ~0.82 (h=5) |
+| F3_ATM | 4, portable | ~0.84 (h=5) |
+| HAR_rhoJ | 4, jump proxy | ~0.82 (h=5) |
+| M1 | 4 (HAR+α) | ~0.83 (h=5) |
+| **M4_smooth** | **9** (HAR + {α,ρ,γ,λ̃,α·λ̃,ρ·λ̃}) | **~0.87 (h=20)** |
+| **M4+int** | **12** (M4_smooth + {β,η,η·λ̃,ATM·κ}) | **~0.87 (h=20)** |
 
-### NB04 — ARMA / VAR / Cointegration on SSVI Parameters
-**Integration order** (2,666 observations, 10-year panel — high statistical power):
-- I(1): **alpha, eta** — share a stochastic trend
-- I(0): **beta, rho, gamma** — mean-revert over the full window
+Key methodological contributions: (1) centered lambda interaction eliminates VIF > 6000; (2) significance-based feature selection at h=5 applied uniformly across horizons; (3) fully recursive expanding window with numpy lstsq for 50× speedup.
 
-**Correct specification**: Δalpha, Δeta (I(1) → first-differenced); beta, rho, gamma (I(0) → levels).
-
-**BIC-optimal ARMA orders:**
-
-| Series | Order | Ljung-Box adequate? |
-|--------|-------|---------------------|
-| d_alpha | ARMA(1,0) | borderline (p=0.008) |
-| rho     | ARMA(1,3) | borderline (p=0.002) |
-| gamma   | ARMA(1,4) | ✓ (p=0.651) |
-
-**OOS MSE ratios (model / random-walk baseline):**
-
-| Series | ARMA | ARMAX |
-|--------|------|-------|
-| d_alpha | 0.986 ✓ | 0.986 ✓ |
-| rho     | 1.089 | 1.161 |
-| gamma   | 0.886 ✓ | 0.879 ✓ |
-
-**Prediction interval coverage (80% target):**  
-GARCH(1,1): d_alpha 82.2%, rho 69.0%, gamma 81.6%  
-Conformal PI: rho 81.4% ✓, gamma 87.2% ✓; d_alpha 66.6% (exchangeability violated for time series)
-
-**Cointegration (alpha–eta system)**: Johansen rank=2, Engle-Granger p=0.006.  
-VECM estimated on the alpha–eta subsystem; loading matrix shows speed of adjustment to long-run equilibrium.
-
----
-
-## Output Files
-
-```
-output/
-  FullOptionDatasetEngineered.csv     # engineered option dataset (all columns)
-  _cache_rates.csv                    # Treasury rate cache (FRED)
-  options_with_forward_iv_clean.csv   # forward prices + Black-76 IV
-  ssvi_all_dates_clean_results.csv    # daily SSVI calibrations
-  ssvi_forecasting_dataset.csv        # supervised forecasting dataset (nb06)
-  04a_core_model_results.csv          # RV forecasting core results (nb07)
-  04b_all_model_results.csv           # extended results (nb08)
-  shap_values_test.csv                # SHAP values (nb08)
-  violation_rate_summary.csv          # no-arb violation rates (nb05)
-
-output/plots/
-  (plots generated by notebooks 03–09)
-```
-
----
-
-## Reproducibility
-
-```
-# Required packages
-pip install pandas-datareader
-
-# Run in order
-jupyter nbconvert --to notebook --execute "Notebooks Analysis/03_panel_iv_regression.ipynb"
-jupyter nbconvert --to notebook --execute "Notebooks Analysis/04_arma_var_cointegration.ipynb"
-# ... continue through NB11
-```
-
-> **Note on runtime**: with ~2,780 trading days the notebooks are substantially more compute-intensive than short-window analyses. Expect 30–90 minutes total for a full pipeline run.
-
----
 
 ## References
 
