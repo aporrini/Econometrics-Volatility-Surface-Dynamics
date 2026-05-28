@@ -164,9 +164,21 @@ def compute_delta_iv_panel(iv_panel: pd.DataFrame) -> pd.DataFrame:
 
 
 def compute_surface_move(delta_iv: pd.DataFrame) -> pd.Series:
-    """Equal-weighted RMS of ΔIV across all grid columns (global surface move)."""
-    s = delta_iv.fillna(0.0).pow(2).mean(axis=1).pipe(np.sqrt)
+    """Equal-weighted RMS of ΔIV across all grid columns (global surface move).
+
+    Missing ΔIV values are skipped (not treated as zero moves).
+    Emits a warning for any day where fewer than 80% of grid points are valid.
+    """
+    s = np.sqrt(delta_iv.pow(2).mean(axis=1, skipna=True))
     s.name = 'surface_move'
+    valid_ratio = delta_iv.notna().mean(axis=1)
+    low = valid_ratio[valid_ratio < 0.80]
+    if len(low) > 0:
+        warnings.warn(
+            f'{len(low)} days have <80% valid ΔIV grid points '
+            f'(min={low.min():.1%}). RMS computed on available points.',
+            stacklevel=2,
+        )
     return s
 
 
@@ -180,7 +192,7 @@ def compute_move_by_maturity(
     move = pd.DataFrame(index=delta_iv.index)
     for t_lbl, t_str in mat_t_map.items():
         cols_t = [c for c in grid_cols if f'_T_{t_str}' in c]
-        move[f'move_{t_lbl}'] = delta_iv[cols_t].fillna(0.0).pow(2).mean(axis=1).pipe(np.sqrt)
+        move[f'move_{t_lbl}'] = np.sqrt(delta_iv[cols_t].pow(2).mean(axis=1, skipna=True))
     return move
 
 
@@ -641,18 +653,21 @@ def backtest_spread_coverage(
             continue
         act, sf, as_, add = (actual_rv.loc[common], sf_ser.loc[common],
                               as_ser.loc[common],   addon_ser.loc[common])
-        cov = act <= sf
+        cov    = act <= sf
+        cov_as = act <= as_
         rows.append({
-            'bucket':          bucket_key,
-            'n':               len(common),
-            'coverage':        float(cov.mean()),
-            'exceedance':      float((~cov).mean()),
-            'mean_AS':         float(as_.mean()),
-            'mean_addon':      float(add.mean()),
-            'mean_final':      float(sf.mean()),
-            'addon_share':     float(add.mean() / (sf.mean() + 1e-12)),
-            'underquote_loss': float((act[~cov] - sf[~cov]).mean()) if (~cov).sum() > 0 else 0.0,
-            'overquote_proxy': float((sf[cov]  - act[cov]).mean())  if cov.sum()  > 0 else 0.0,
+            'bucket':               bucket_key,
+            'n':                    len(common),
+            'coverage_AS':          float(cov_as.mean()),
+            'coverage':             float(cov.mean()),
+            'coverage_improvement': float(cov.mean() - cov_as.mean()),
+            'exceedance':           float((~cov).mean()),
+            'mean_AS':              float(as_.mean()),
+            'mean_addon':           float(add.mean()),
+            'mean_final':           float(sf.mean()),
+            'addon_share':          float(add.mean() / (sf.mean() + 1e-12)),
+            'underquote_loss':      float((act[~cov] - sf[~cov]).mean()) if (~cov).sum() > 0 else 0.0,
+            'overquote_proxy':      float((sf[cov]  - act[cov]).mean())  if cov.sum()  > 0 else 0.0,
         })
     return pd.DataFrame(rows)
 
@@ -989,12 +1004,20 @@ def plot_spread_decomposition(
     x   = np.arange(len(bt_df))
     lbl = bt_df['bucket'].values
     fig, axes = plt.subplots(1, 2, figsize=(12, 4))
-    fig.suptitle('L. Backtest Results by Bucket', fontsize=11, fontweight='bold')
+    fig.suptitle('Backtest Results by Bucket', fontsize=11, fontweight='bold')
     ax = axes[0]
-    ax.bar(x, bt_df['coverage'].values, color='steelblue', alpha=0.8, edgecolor='white')
+    if 'coverage_AS' in bt_df.columns:
+        ax.bar(x - 0.18, bt_df['coverage_AS'].values, 0.32,
+               label='Coverage (AS baseline)', color='lightsteelblue', alpha=0.85)
+        ax.bar(x + 0.18, bt_df['coverage'].values, 0.32,
+               label='Coverage (spread_final)', color='seagreen', alpha=0.85)
+        ax.set_title('Coverage: AS Baseline vs spread_final')
+    else:
+        ax.bar(x, bt_df['coverage'].values, color='seagreen', alpha=0.8)
+        ax.set_title('Coverage')
     ax.axhline(0.95, ls='--', color='red', lw=1.2, label='95% target')
     ax.set_xticks(x); ax.set_xticklabels(lbl, rotation=20, fontsize=8)
-    ax.set_title('Coverage'); ax.legend(fontsize=9); ax.set_ylim(0, 1.05)
+    ax.legend(fontsize=9); ax.set_ylim(0, 1.05)
     ax = axes[1]
     ax.bar(x - 0.2, bt_df['mean_AS'].values,    0.35, label='mean_AS',    color='steelblue', alpha=0.8)
     ax.bar(x + 0.2, bt_df['mean_addon'].values,  0.35, label='mean_addon', color='darkorange', alpha=0.8)
