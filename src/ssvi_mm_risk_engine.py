@@ -765,7 +765,7 @@ def plot_jump_detection_comparison(
     """Save plots/{prefix}_jump_detection_comparison.png."""
     TARGET_LO, TARGET_HI = 5.0, 15.0
     fig, axes = plt.subplots(2, 1, figsize=(14, 6), sharex=True)
-    fig.suptitle('FIX 2 — Jump Detection Comparison', fontsize=11, fontweight='bold')
+    fig.suptitle('Jump Detection Comparison  (BPV vs rolling-threshold)', fontsize=11, fontweight='bold')
 
     ax = axes[0]
     smove.plot(ax=ax, lw=0.5, color='grey', alpha=0.6, label='surface_move')
@@ -805,7 +805,7 @@ def plot_pca_loadings(
 ) -> None:
     """Save plots/{prefix}_pca_loadings.png."""
     fig, axes = plt.subplots(1, 3, figsize=(15, 4))
-    fig.suptitle('H. PCA Loadings on ΔIV  (PC1=level, PC2=skew, PC3=curvature)',
+    fig.suptitle('PCA Loadings on ΔIV  (PC1=level, PC2=skew, PC3=curvature)',
                  fontsize=11, fontweight='bold')
     for ax, pc_i, title in zip(axes, [1, 2, 3],
                                 ['PC1 (level)', 'PC2 (skew)', 'PC3 (curvature)']):
@@ -826,7 +826,7 @@ def plot_pca_loadings(
 def plot_pca_scores(pc_df: pd.DataFrame, plot_dir: Path, prefix: str = '07') -> None:
     """Save plots/{prefix}_pca_scores.png."""
     fig, axes = plt.subplots(3, 1, figsize=(14, 7), sharex=True)
-    fig.suptitle('H. PC Scores  (daily ΔIV surface projections)', fontsize=10)
+    fig.suptitle('PC Scores  (daily ΔIV surface projections)', fontsize=10)
     for i, (ax, col, color) in enumerate(zip(axes, ['PC1', 'PC2', 'PC3'],
                                               ['#1f77b4', '#ff7f0e', '#2ca02c'])):
         pc_df[col].plot(ax=ax, lw=0.5, color=color, alpha=0.7)
@@ -849,7 +849,7 @@ def plot_hmm_regimes(
     reg_colors = {0: 'green', 1: 'orange', 2: 'red'}
     fig, axes  = plt.subplots(2, 1, figsize=(14, 6),
                                gridspec_kw={'height_ratios': [2, 1]})
-    fig.suptitle('I. HMM Regime Detection  (3-state Gaussian HMM on log RV₂₂d)',
+    fig.suptitle('HMM Regime Detection  (3-state Gaussian HMM on log RV₂₂d)',
                  fontsize=11, fontweight='bold')
 
     ax = axes[0]
@@ -892,7 +892,7 @@ def plot_forecast_global(
     _wf   = np.exp(fc_wf_ser.reindex(split_test))
 
     fig, axes = plt.subplots(2, 1, figsize=(14, 8))
-    fig.suptitle(f'G. Global Surface RV Forecast  (test set, h={h_main}d)',
+    fig.suptitle(f'Global Surface RV Forecast  (test set, h={h_main}d)',
                  fontsize=12, fontweight='bold')
     ax = axes[0]
     _tgt.plot(ax=ax, lw=0.7, color='black', alpha=0.7, label=f'actual RV{h_main}')
@@ -933,7 +933,7 @@ def plot_cstar_term_structure(
     vm        = np.isfinite(cstar_v)
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 4))
-    fig.suptitle('FIX 1 — c* Term Structure  (val-set ES₉₅)', fontsize=11, fontweight='bold')
+    fig.suptitle('c* Term Structure  (val-set ES₉₅)', fontsize=11, fontweight='bold')
 
     ax = axes[0]
     ax.scatter(T_vals[vm], cstar_v[vm], s=80, color='navy', zorder=5, label='c*(T)')
@@ -977,7 +977,7 @@ def plot_spread_decomposition(
     _add = _sf - _as
 
     fig, axes = plt.subplots(2, 1, figsize=(14, 8))
-    fig.suptitle('L. Spread Decomposition  (global, test set)', fontsize=11, fontweight='bold')
+    fig.suptitle('Spread Decomposition  (global, test set)', fontsize=11, fontweight='bold')
     ax = axes[0]
     _sf.plot(ax=ax,  lw=1.0, color='navy',       label='spread_final')
     _as.plot(ax=ax,  lw=0.9, color='steelblue', ls='--', label='spread_AS')
@@ -1004,7 +1004,7 @@ def plot_spread_decomposition(
     x   = np.arange(len(bt_df))
     lbl = bt_df['bucket'].values
     fig, axes = plt.subplots(1, 2, figsize=(12, 4))
-    fig.suptitle('Backtest Results by Bucket', fontsize=11, fontweight='bold')
+    fig.suptitle('Coverage Evaluation Results by Bucket', fontsize=11, fontweight='bold')
     ax = axes[0]
     if 'coverage_AS' in bt_df.columns:
         ax.bar(x - 0.18, bt_df['coverage_AS'].values, 0.32,
