@@ -1,0 +1,11 @@
+series,order,MSE_ratio,R2_OOS,LB_p,ARCH_p,JB_p,LB_adequate
+alpha,"ARMA(1,0)",1.0,0.0,0.0737,0.0,0.0,True
+beta,"ARMA(1,1)",1.0,0.0,0.0635,0.0,0.0,True
+rho,"ARMA(1,1)",1.0,0.0,0.0236,0.0,0.0,False
+eta,"ARMA(1,1)",1.0,0.0,0.0086,0.0,0.0,False
+gamma,"ARMA(1,1)",1.0,0.0,0.0037,0.0,0.0,False
+d_alpha,"ARMA(1,1)",1.0,0.0,0.4255,0.0,0.0,True
+d_beta,"ARMA(0,1)",1.0,0.0,0.0102,0.0,0.0,False
+d_rho,"ARMA(3,0)",1.0,0.0,0.4853,0.0,0.0,True
+d_eta,"ARMA(1,2)",1.0,0.0,0.1541,0.0,0.0,True
+d_gamma,"ARMA(0,1)",1.0,0.0,0.0005,0.0,0.0,False

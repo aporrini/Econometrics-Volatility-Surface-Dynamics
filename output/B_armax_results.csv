@@ -1,0 +1,11 @@
+series,order,MSE_ratio,R2_OOS,DM_stat,DM_p,beats_RW
+alpha,"ARMAX(1, 0)",1.0,0.0,,,False
+beta,"ARMAX(1, 1)",1.0,0.0,,,False
+rho,"ARMAX(1, 1)",1.0,0.0,,,False
+eta,"ARMAX(1, 1)",1.0,0.0,,,False
+gamma,"ARMAX(1, 1)",1.0,0.0,,,False
+d_alpha,"ARMAX(1, 1)",1.0,0.0,,,False
+d_beta,"ARMAX(0, 1)",1.0,0.0,,,False
+d_rho,"ARMAX(3, 0)",1.0,0.0,,,False
+d_eta,"ARMAX(1, 2)",1.0,0.0,,,False
+d_gamma,"ARMAX(0, 1)",1.0,0.0,,,False

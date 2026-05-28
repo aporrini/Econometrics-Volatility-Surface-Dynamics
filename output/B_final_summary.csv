@@ -1,0 +1,11 @@
+series,I_order,ARMA_order,ARMA_ratio,ARMA_R2,ARMA_LB_ok,ARMAX_ratio,ARMAX_R2,best_model,best_ratio,beats_RW
+alpha,Uncertain,"(1, 0)",1.0,0.0,True,1.0,0.0,ARMA,1.0,False
+beta,Uncertain,"(1, 1)",1.0,0.0,True,1.0,0.0,ARMA,1.0,False
+rho,Uncertain,"(1, 1)",1.0,0.0,False,1.0,0.0,ARMA,1.0,False
+eta,Uncertain,"(1, 1)",1.0,0.0,False,1.0,0.0,ARMA,1.0,False
+gamma,Uncertain,"(1, 1)",1.0,0.0,False,1.0,0.0,ARMA,1.0,False
+d_alpha,Uncertain,"(1, 1)",1.0,0.0,True,1.0,0.0,ARMA,1.0,False
+d_beta,Uncertain,"(0, 1)",1.0,0.0,False,1.0,0.0,ARMA,1.0,False
+d_rho,Uncertain,"(3, 0)",1.0,0.0,True,1.0,0.0,ARMA,1.0,False
+d_eta,Uncertain,"(1, 2)",1.0,0.0,True,1.0,0.0,ARMA,1.0,False
+d_gamma,Uncertain,"(0, 1)",1.0,0.0,False,1.0,0.0,ARMA,1.0,False
