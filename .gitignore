@@ -1,3 +1,9 @@
 FullOptionDatasetEngineered.csv
+
+# Output data files (too large for GitHub)
 output/**/*.csv
 output/*.csv
+output/**/*.pkl
+output/*.pkl
+output/**/*.parquet
+output/*.parquet
