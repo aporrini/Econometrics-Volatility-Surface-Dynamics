@@ -7,7 +7,7 @@ Authors: Alessio Porrini, Marco Amarilli, Camilla Introzzi, Christian Frigerio
 
 ## Overview
 
-Full analytical pipeline for SSVI (Surface Stochastic Volatility Inspired) implied volatility dynamics and realized volatility forecasting using **SPX daily European options**, with calibrated parameters spanning 2010–2025 (~2,652 trading days).
+Full analytical pipeline for SSVI (Surface Stochastic Volatility Inspired) implied volatility dynamics and realized volatility forecasting using **SPX daily European options**, with calibrated parameters spanning 2010–2020 (~2,633 trading days).
 
 ---
 
@@ -26,7 +26,7 @@ PROGETTO_FINAL/
 │   ├── S1_feature_engineering_pipeline.ipynb
 │   └── S2_frontier_analyses.ipynb
 ├── econometric_analysis/
-│   ├── A_implied_volatility_panel.ipynb   # Panel IV regression (1.8M obs)
+│   ├── A_implied_volatility_panel.ipynb   # Panel IV regression (~1.5M obs)
 │   ├── B_ssvi_parameter_dynamics.ipynb    # SSVI parameter time-series
 │   ├── C_realized_volatility_forecasting.ipynb  # RV forecasting (primary)
 │   └── D_ssvi_surface_risk_addon.ipynb    # Surface risk engine + MM spread
@@ -44,10 +44,10 @@ PROGETTO_FINAL/
 Loads ~3.3M raw option observations. Applies quality filters (mid > $0.05, TTE > 7d, bid-ask/mid ≤ 30%, log-moneyness ∈ [−0.40, 0.30]). Output: ~2.3M clean observations.
 
 ### `01_iv_dataset_construction.ipynb`
-Computes Black-76 IV via vectorized Newton-Raphson. Extracts implied forward prices via put-call parity. Output: ~1.8M IV observations.
+Computes Black-76 IV via vectorized Newton-Raphson. Extracts implied forward prices via put-call parity. Output: ~1.5M IV observations.
 
 ### `02_ssvi_calibration.ipynb`
-Calibrates SSVI surface per trading day subject to butterfly and calendar no-arbitrage constraints. Writes `Data/ssvi_all_dates_clean_results.csv`. Success rate: **96.3%** (2,653 / 2,768 days), median RMSE_iv < 0.01, zero calendar arbitrage violations.
+Calibrates SSVI surface per trading day subject to butterfly and calendar no-arbitrage constraints. Writes `Data/ssvi_all_dates_clean_results.csv`. Success rate: **95.1%** (2,633 / 2,768 days), median RMSE_iv < 0.01, zero calendar arbitrage violations.
 
 ---
 
@@ -56,7 +56,7 @@ Calibrates SSVI surface per trading day subject to butterfly and calendar no-arb
 ### Notebook A — Panel Implied Volatility Regression
 `econometric_analysis/A_implied_volatility_panel.ipynb`
 
-Regresses Black-76 IV on option structural features (forward moneyness, TTE, liquidity) across 1.81M observations. Uses within-transformation (time-demeaning) to avoid an explicit 37.5 GB dummy matrix.
+Regresses Black-76 IV on option structural features (forward moneyness, TTE, liquidity) across ~1.49 million observations. Uses within-transformation (time-demeaning) to avoid an explicit ~31 GB dummy matrix.
 
 Sections: Data loading → EDA → Pooled OLS → Day FE → Day + Maturity FE → Hausman test (FE vs RE) → RESET test → log(IV) robustness → Gauss-Markov diagnostics → Key findings.
 
@@ -65,7 +65,7 @@ Sections: Data loading → EDA → Pooled OLS → Day FE → Day + Maturity FE �
 ### Notebook B — SSVI Parameter Dynamics
 `econometric_analysis/B_ssvi_parameter_dynamics.ipynb`
 
-**Data:** 2,652 obs (2010–2025). Train: 2,121 obs (through 2022-06-08). Test: 531 obs (2022–2025).
+**Data:** 2,632 obs (2010–2025). Train: 2,105 obs (through 2022-06-17). Test: 527 obs (2022–2025).
 
 **Sections:**
 
@@ -77,7 +77,7 @@ Sections: Data loading → EDA → Pooled OLS → Day FE → Day + Maturity FE �
 | 3b. HAR Modelling | HAR(1,5,22) long-memory forecast of the *differenced* SSVI parameters (Corsi 2009 / Andrès et al. 2025) |
 | 4. VAR Analysis | VAR(2, BIC-optimal) on 5-parameter system |
 | 5. Cointegration | Johansen + Engle-Granger for α–η |
-| 6. PCA on SSVI Surface | HAR on PC scores (level forecasting) |
+| 6. PCA on SSVI Surface Changes | HAR on PC scores of Δω — null result (see below) |
 | 7. Comprehensive Results | Full horse-race commentary |
 | 8. Vol Surface Prediction | Sticky vs ARMA vs VAR surface RMSE |
 | Appendix A | Stationarity (ADF + KPSS, 10 series) |
@@ -106,11 +106,11 @@ Sections: Data loading → EDA → Pooled OLS → Day FE → Day + Maturity FE �
 
 - **VAR(2) OOS:** Mostly MSE > 1. Only γ achieves MSE-ratio = **0.938** (beats RW slightly).
 
-- **Cointegration (α, η):** Johansen rank = 2; Engle-Granger p = **0.0002*** — cointegrated. VECM OOS: α R²=+0.004 (barely positive), η R²=−0.018 (negative → VECM misspecified for η).
+- **Cointegration (α, η):** full-sample Johansen rank = 2 — *full rank* in a bivariate system, i.e. evidence that both series are individually (near-)stationary rather than jointly tied by a single I(1) long-run attractor (which would instead show up as rank = 1). Engle-Granger still finds a significant long-run linear relationship (p = **0.0002***), but VECM OOS performance is essentially nil: α R²=+0.004 (barely positive), η R²=−0.018 (negative → VECM misspecified for η).
 
-- **Rolling Johansen (500-day windows):** Rank=1 (genuine cointegration) in **29.7%** of windows, rank=2 in 63.6%. Regime-conditional cointegration: EG calm p=0.0004, EG stress p=0.048.
+- **Rolling Johansen (500-day windows):** rank = 0 in 2.8%, rank = 1 (genuine single cointegrating vector) in **30.0%**, and rank = 2 (full rank — both series individually stationary) in **67.2%** of windows. The estimated rank — and hence the I(1)/I(0) reading of the system — is itself regime-dependent and correlated with the VIX level (EG calm p=0.0004, EG stress p=0.155).
 
-- **PCA on SSVI surface:** 2 PCs explain **99.1%** of variance (PC1=96.34% Level, PC2=2.76% Slope). HAR on PC scores: R²_OOS = **0.926** at h=1, **0.741** at h=5, **0.493** at h=20 (vs naive persistence in surface space).
+- **PCA on SSVI surface changes (Δω):** 3 PCs explain **99.1%** of variance (PC1=92.69% common daily shock, PC2=4.38% term-structure tilt, PC3=2.04% smile-curvature shock). HAR on these PC scores returns *negative* R²_OOS = **−0.004 / −0.020 / −0.008** at h=1/5/20 — i.e. it underperforms the trivial zero-change (random-walk) baseline at every horizon. This is a clean null result: daily *changes* along the leading principal directions of the surface are near-white-noise, mirroring the near-random-walk behaviour already documented for the individual SSVI parameters (see *Notes on findings* below).
 
 - **Caching:** Expensive OOS loops cached in `output/cache/`. Set `FORCE_RECOMPUTE = True` to regenerate.
 
@@ -145,13 +145,13 @@ Targets $y_t^{(h)} = \frac{1}{h}\sum_{i=1}^h \log\text{RV}_{t+i}$ for $h \in \{1
 | Model | Features | h=1 R²_OOS | h=5 R²_OOS | DM(h=5) | h=20 R²_OOS | DM(h=20) |
 |-------|----------|------------|------------|---------|-------------|---------|
 | Naive | RW | 0.000 | 0.000 | — | 0.000 | — |
-| **HAR** | 3 | **0.465** | **0.846** | — | **0.857** | — |
-| HAR+VIX | 4 | 0.489 | 0.832 | −0.59 | 0.864 | +0.53 |
-| F3_ATM | 4 | 0.465 | 0.840 | −2.48** | 0.847 | −1.87* |
-| HAR_rhoJ | 4 | 0.465 | 0.846 | +0.03 | 0.857 | −0.82 |
-| M1 | 4 | 0.466 | 0.842 | −2.51** | 0.849 | −1.92* |
-| M4_smooth | 9 | 0.449 | 0.823 | −3.47*** | 0.811 | −2.72*** |
-| M4+int | 12 | 0.453 | 0.833 | −2.29** | 0.829 | −1.78* |
+| **HAR** | 3 | **0.466** | **0.846** | — | **0.857** | — |
+| HAR+VIX | 4 | 0.488 | 0.832 | −0.58 | 0.864 | +0.52 |
+| F3_ATM | 4 | 0.465 | 0.840 | −2.47** | 0.846 | −1.87* |
+| HAR_rhoJ | 4 | 0.465 | 0.846 | −0.72 | 0.857 | −0.38 |
+| M1 | 4 | 0.466 | 0.842 | −2.51** | 0.849 | −1.93* |
+| M4_smooth | 9 | 0.449 | 0.819 | −3.59*** | 0.806 | −2.78*** |
+| M4+int | 12 | 0.451 | 0.825 | −2.82*** | 0.817 | −2.13** |
 
 DM convention: positive = model beats HAR, negative = model is worse than HAR.
 
@@ -176,7 +176,7 @@ In the expanding window, HAR+VIX is the marginal winner but DM is not significan
 ### Notebook D — SSVI Surface Risk Add-on Engine
 `econometric_analysis/D_ssvi_surface_risk_addon.ipynb`
 
-**Data:** 2,652 trading days, 45-point IV grid (9 strikes × 5 maturities). Split: 70/15/15 chronological (no shuffle). surface_move: mean=0.00536 vol-units, std=0.00789.
+**Data:** 2,633 trading days, 45-point IV grid (9 strikes × 5 maturities). Split: 70/15/15 chronological (no shuffle). surface_move: mean = 0.00583 vol-units, std = 0.00798.
 
 **Sections:**
 
@@ -195,25 +195,25 @@ In the expanding window, HAR+VIX is the marginal winner but DM is not significan
 
 **Key results:**
 
-- **Jump detection:** BPV rate = 31.3% (too loose); selected Method A (q95+2σ) → 1.4% jump rate. HAR-J vs HAR DM is not significant (p=0.959) — jumps add no forecasting improvement.
+- **Jump detection:** BPV rate = 29.7% (too loose); selected Method A (q95+2σ) → 1.4% jump rate. HAR-J vs HAR DM is not significant (p = 0.290) — jumps add no forecasting improvement.
 
-- **c*(T) term structure:** c*(T) = 5.413 − 3.488√T, R² = **0.941**. c* strictly decreasing: short-dated RV forecasts understate tail risk more severely than long-dated. The √T scaling is consistent with Brownian surface dynamics.
+- **c*(T) term structure:** c*(T) = 4.950 − 3.208√T, R² = **0.949**. c* strictly decreasing: short-dated RV forecasts understate tail risk more severely than long-dated. The √T scaling is consistent with Brownian surface dynamics.
 
 - **Coverage:**
 
 | Bucket | Coverage (spread_AS only) | Coverage (spread_final) |
 |--------|--------------------------|------------------------|
-| Global | 61.2% | **96.2%** |
-| 1M | 28.4% | 97.7% |
-| 3M | 54.8% | 97.5% |
+| Global | 57.3% | **95.9%** |
+| 1M | 19.4% | 97.4% |
+| 3M | 48.1% | 96.9% |
 
-The AS-style baseline alone dramatically under-covers (28–61%). The residual-risk add-on (74% of total spread globally) is necessary to reach target coverage.
+The AS-style baseline alone dramatically under-covers (19–57%). The residual-risk add-on (74% of total spread globally) is necessary to reach target coverage.
 
-- **Pointwise surface containment:** 48.1% with spread_AS, **84.4%** with spread_final.
+- **Pointwise surface containment:** 47.5% with spread_AS, **82.9%** with spread_final.
 
-- **PCA on ΔIV (Appendix):** PC1=87.6% (surface level shift), PC2=7.1%, PC3=3.0%; 3 PCs explain 97.7%.
+- **PCA on ΔIV (Appendix):** PC1=84.0% (surface level shift), PC2=10.1%, PC3=3.5%; 3 PCs explain 97.5%.
 
-- **HMM regimes (Appendix):** 3 regimes — Low-vol 23%, Mid-vol 23%, High-vol 54%. High-vol is the dominant regime over 2010–2020.
+- **HMM regimes (Appendix):** 3 regimes — Low-vol 24% (641 days), Mid-vol 25% (666 days), High-vol 50% (1,316 days). High-vol is the dominant regime over 2010–2020.
 
 ---
 
@@ -228,6 +228,58 @@ Advanced structural analyses:
 - CUSUM parameter stability
 - Granger causality between SSVI parameters and macro variables
 - Path-dependence analysis (Andres et al. 2025 framework)
+
+---
+
+## Notes on the Review (corrections worth flagging)
+
+A line-by-line review of every executed cell against the markdown narrative surfaced a handful
+of genuinely interesting points — some are corrections to stale text, one is a substantive
+finding about the data pipeline itself:
+
+1. **The PCA result reverses sign once read correctly.** The pre-review narrative claimed
+   Section 6 of Notebook B found *positive* OOS predictability for the surface level
+   (R²_OOS = 0.926/0.741/0.493, attributed to a "PC1 = level, mean-reverting" story). The
+   notebook actually runs PCA on **surface *changes* Δω**, not levels — and the printed output
+   shows *negative* R²_OOS = −0.004/−0.020/−0.008 at every horizon. This is not a minor
+   numerical slip: it is the opposite empirical conclusion (a clean null result rather than a
+   "key positive finding"), and it is actually the *more* interesting result, because it shows
+   the near-random-walk behaviour documented for individual SSVI parameters extends cleanly to
+   the dominant joint directions of the surface itself — i.e. the IV surface looks efficiently
+   priced both parameter-by-parameter *and* in its principal directions of daily variation.
+
+2. **Johansen rank = 2 does not mean "cointegrated."** The original commentary read the
+   full-sample Johansen rank of 2 (for the bivariate {α, η} system) as confirming cointegration.
+   In a two-variable VAR, full rank (= 2) means *both series are individually stationary* —
+   the genuine single-cointegrating-vector case is rank = 1. The corrected reading (both series
+   ≈ I(0), with the relationship itself regime-dependent — rank fluctuates between 0/1/2 across
+   rolling windows and tracks the VIX level) is arguably the more interesting econometric story,
+   since it reframes the α–η relationship as a structural, regime-conditional feature of the
+   SSVI parametrisation rather than a stable tradeable spread.
+
+3. **The γ-sensitivity "regime boundary" was mis-located by one step.** Notebook D's
+   Section 7 interpretation placed the sharp collapse of `c*` "between γ = 0.5 and γ = 1.0".
+   The printed table shows `c*` only declines moderately there (≈3.1 → ≈2.2, ~30%); the real
+   collapse (≈2.2 → ≈0.07, ~97%) happens between **γ = 1.0 and γ = 2.0**. This matters
+   practically: it is the point beyond which a wider baseline AS-style quote alone already
+   nears the 95% ES coverage target and the HAR-J residual-risk add-on becomes redundant.
+
+4. **A likely date-axis bug in Notebook B (flagged, not fixed).** Notebook B reconstructs
+   calendar dates from the `time_elapsed` index via `pd.bdate_range(...)[time_elapsed]` —
+   i.e. it treats `time_elapsed` as a *business-day* index — which yields a stated span of
+   **2010–2025** (`SSVI: 2,633 successful calibrations | 2010-05-25 to 2025-05-23`). Notebook D
+   and `src/ssvi_mm_risk_engine.py::load_ssvi_results`, by contrast, treat `time_elapsed` as a
+   **calendar-day** offset (`_SSVI_START + pd.to_timedelta(time_elapsed, unit='D')`), which
+   yields **2010–2020** — consistent with every notebook's own title and with the documented
+   ~2,768-trading-day sample. The two conventions cannot both be right; we left Notebook B's
+   date-handling code untouched (per the "comments/markdown only" review scope) but **the
+   reader should treat Notebook B's absolute calendar-date labels as provisional**. This does
+   not affect any of the reported statistics — train/test splits, rolling windows, and
+   regression results are all defined on the row index, not on the reconstructed calendar date —
+   but the date axis on Notebook B's time-series plots and any "as of [date]" narrative should
+   be read with this caveat in mind. The one-line fix, if pursued, would be to replace the
+   `pd.bdate_range` indexing with the same `_SSVI_START + pd.to_timedelta(time_elapsed, unit='D')`
+   logic used in the risk engine.
 
 ---
 
