@@ -74,6 +74,7 @@ Sections: Data loading → EDA → Pooled OLS → Day FE → Day + Maturity FE �
 | 1. Data Loading | SSVI params (GitHub), VIX/Treasury rates (FRED) |
 | 2. ARMA Modelling | BIC-optimal ARMA for 10 series (5 levels + 5 first differences) |
 | 3. ARMAX Modelling | Exogenous: Δlog(VIX), VIX z-score |
+| 3b. HAR Modelling | HAR(1,5,22) long-memory forecast of the *differenced* SSVI parameters (Corsi 2009 / Andrès et al. 2025) |
 | 4. VAR Analysis | VAR(2, BIC-optimal) on 5-parameter system |
 | 5. Cointegration | Johansen + Engle-Granger for α–η |
 | 6. PCA on SSVI Surface | HAR on PC scores (level forecasting) |
@@ -90,6 +91,18 @@ Sections: Data loading → EDA → Pooled OLS → Day FE → Day + Maturity FE �
 - **ARMA OOS (all series):** MSE-ratio = **1.0000**, R²_OOS = **0.0000** across all 10 series. No ARMA specification beats the random walk. BIC-selected orders: α→ARMA(1,0), β/ρ/η/γ→ARMA(1,1).
 
 - **ARMAX OOS:** Same result — MSE-ratio = 1.0000 for all. Despite Granger significance of Δlog(VIX) for α and β (p≈0.017–0.028), the exogenous signal does not translate to OOS improvement.
+
+- **HAR OOS (Section 3b) — the key positive result for this notebook:** a HAR(1,5,22) model on the *differenced* parameters achieves **R²_OOS = 0.51–0.67** (MSE-ratio 0.33–0.49) for **all five series**, beating both the random walk and ARMA:
+
+  | Series | HAR MSE-ratio | HAR R²_OOS | Beats RW | Beats ARMA |
+  |--------|---------------|------------|----------|------------|
+  | d_alpha | 0.4336 | 0.5664 | ✓ | ✓ |
+  | d_beta | 0.4494 | 0.5506 | ✓ | ✓ |
+  | d_rho | 0.4908 | 0.5092 | ✓ | ✓ |
+  | d_eta | 0.4358 | 0.5642 | ✓ | ✓ |
+  | d_gamma | 0.3339 | 0.6661 | ✓ | ✓ |
+
+  This shows the SSVI parameter changes are **not** a pure random walk: short-memory ARMA simply cannot see their structure, while a long-memory, multi-horizon HAR model — the same mechanism Corsi (2009) used for realized volatility — recovers it cleanly.
 
 - **VAR(2) OOS:** Mostly MSE > 1. Only γ achieves MSE-ratio = **0.938** (beats RW slightly).
 

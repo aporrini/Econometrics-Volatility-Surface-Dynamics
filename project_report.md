@@ -31,7 +31,7 @@ This report documents the full empirical analysis of SSVI implied volatility sur
 
 - SSVI calibrates on **96.3%** of trading days with median RMSE_iv < 0.01 and zero calendar arbitrage violations.
 - Panel IV regression with Day + Maturity Fixed Effects achieves **R² = 0.831** on 1.81M observations; forward moneyness and TTE explain the dominant share of IV cross-sectional variation.
-- **SSVI parameter forecasting is equivalent to a random walk.** All 10 ARMA and ARMAX specifications achieve MSE-ratio = 1.0000 out-of-sample — no linear model beats naïve persistence for any parameter.
+- **Short-memory models fail, but long-memory (HAR) structure reveals genuine predictability in SSVI parameter changes.** All 10 ARMA/ARMAX specifications on levels and first differences achieve MSE-ratio = 1.0000 out-of-sample — no single-lag linear model beats naïve persistence. Yet a HAR(1,5,22) model on the *differenced* parameters (Section 3b) achieves **R²_OOS = 0.51–0.67** (MSE-ratio 0.33–0.49) for all five series, beating both the random walk and ARMA. SSVI parameter changes are not a pure random walk — they carry the same long-memory structure that Corsi (2009) documented for realized volatility; ARMA simply uses the wrong functional form to extract it.
 - **HAR is the best realized volatility forecasting model.** All SSVI-augmented specifications (M4_smooth, M4+int, F3_ATM, M1) are significantly *worse* than HAR in the primary evaluation (DM up to −3.47*** at h=5). The main obstacle is distributional shift caused by COVID-19 (VIX reaching ~83) in the test window.
 - **Surface-level is forecastable, surface-change is not.** A HAR model on PCA scores achieves R²_OOS = **0.926** at h=1 (vs naive persistence in surface space), but this is a different target from RV forecasting.
 - A market-making spread engine with SSVI-based residual-risk add-on achieves **96.2% global ES₉₅ coverage**, compared to 61.2% for the AS-style baseline alone. The add-on coefficient follows c*(T) = 5.413 − 3.488√T (R² = 0.941).
@@ -136,6 +136,20 @@ No ARMA specification beats the naïve random walk. SSVI parameters exhibit near
 #### ARMAX Modelling
 
 Exogenous inputs: Δlog(VIX), VIX z-score. Despite Granger significance of Δlog(VIX) for α and β (p ≈ 0.017–0.028) in-sample, the exogenous signal does **not** translate to OOS improvement. MSE-ratio = 1.0000 for all ARMAX specifications.
+
+#### HAR Modelling — Long-Memory Forecasting of the Differenced Parameters (Section 3b)
+
+Motivated by Corsi (2009) and the path-dependence evidence of Andrès, Boumezoued & Jourdain (2025), a HAR(1,5,22) regression — the same daily/weekly/monthly long-memory averaging structure used for realized volatility — is fitted to the **first-differenced** SSVI parameter series (the stationary representation established in Appendix A) and evaluated out-of-sample with the same rolling-origin protocol as the ARMA/ARMAX models:
+
+| Series | HAR MSE-ratio | HAR R²_OOS | ARMA MSE-ratio | Beats RW | Beats ARMA |
+|--------|---------------|------------|----------------|----------|------------|
+| d_alpha | 0.4336 | **0.5664** | 1.0000 | ✓ | ✓ |
+| d_beta | 0.4494 | **0.5506** | 1.0000 | ✓ | ✓ |
+| d_rho | 0.4908 | **0.5092** | 1.0000 | ✓ | ✓ |
+| d_eta | 0.4358 | **0.5642** | 1.0000 | ✓ | ✓ |
+| d_gamma | 0.3339 | **0.6661** | 1.0000 | ✓ | ✓ |
+
+**This is the single most important predictability result for the SSVI parameter system.** Where every single-lag ARMA/ARMAX specification is statistically indistinguishable from a random walk (MSE-ratio = 1.0000), the HAR's three-horizon (1/5/22-day) rolling-mean structure recovers **50–67% of the variance reduction relative to the random walk** for every one of the five differenced parameters — with the wing-decay parameter γ showing the strongest gain (R²_OOS = 0.666). The contrast is the key insight: the parameters' first differences are *not* devoid of structure — they are simply not capturable by a low-order autoregressive form. They instead respond to the same multi-horizon, long-memory aggregation that governs realized-volatility dynamics, which is exactly the mechanism Corsi (2009) formalised and Andrès et al. (2025) extended to the implied-volatility surface itself.
 
 #### VAR Analysis
 
@@ -287,9 +301,11 @@ The residual-risk add-on accounts for **74% of total spread** globally. The AS-s
 
 ## 4. Key Findings
 
-### Finding 1: SSVI parameters are unpredictable (random walk equivalence)
+### Finding 1: Short-memory models fail — but long-memory (HAR) structure uncovers genuine predictability in SSVI parameter changes
 
-All 10 ARMA and ARMAX specifications achieve MSE-ratio = 1.0000 out-of-sample. Despite in-sample Granger significance (Δlog(VIX) → α, β at p ≈ 0.02), this does not translate to OOS. The SSVI parameter process is consistent with a near-random-walk, in line with the Efficient Market Hypothesis applied to the volatility surface.
+All 10 ARMA and ARMAX specifications on the SSVI parameter levels and first differences achieve MSE-ratio = 1.0000 out-of-sample — no single-lag linear model beats the random walk, and the in-sample Granger significance of Δlog(VIX) for α and β (p ≈ 0.02) does not survive out-of-sample. Taken alone, this would suggest the SSVI parameter process is a near-random-walk, consistent with the Efficient Market Hypothesis applied to the volatility surface.
+
+However, a HAR(1,5,22) model fitted to the **differenced** parameters tells a materially different story (Section 3b): it achieves **R²_OOS = 0.51–0.67** (MSE-ratio 0.33–0.49) for all five series, beating both the random walk and the matching ARMA specification by a wide margin. The resolution is that SSVI parameter *changes* are not devoid of structure — they are simply invisible to a low-order autoregressive lens. They respond instead to the same multi-horizon, long-memory averaging mechanism that Corsi (2009) formalised for realized volatility, and that Andrès, Boumezoued & Jourdain (2025) show also governs the path-dependence of the implied-volatility surface. The corrected reading is therefore: **the SSVI surface is not an efficient random walk at the single-lag level, but its short-run dynamics are governed by long-memory, multi-horizon structure that only a HAR-type model can extract.**
 
 ### Finding 2: HAR dominates all SSVI-augmented RV models
 

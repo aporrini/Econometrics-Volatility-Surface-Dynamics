@@ -856,7 +856,7 @@ def plot_hmm_regimes(
     smove_a = smove.reindex(regime_s.index)
     for r, color in reg_colors.items():
         ax.fill_between(regime_s.index, 0,
-                        smove_a.where(regime_s == r).ffill().fillna(0),
+                        smove_a.where(regime_s == r, 0.0),
                         alpha=0.35, color=color, label=regime_labels.get(r, str(r)))
     smove_a.plot(ax=ax, lw=0.7, color='black', alpha=0.6)
     ax.set_ylabel('surface_move'); ax.legend(fontsize=9, ncol=3)
