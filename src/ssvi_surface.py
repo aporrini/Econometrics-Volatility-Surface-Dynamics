@@ -34,6 +34,13 @@ import matplotlib.pyplot as plt
 from scipy.optimize import least_squares
 from scipy.stats import linregress
 
+from ssvi_calibration import (
+    filter_delta_butterfly_continuous,
+    SSVI_DELTA_SHORT, SSVI_DELTA_LONG, SSVI_DELTA_DECAY,
+    SSVI_MIN_LEFT_POINTS, SSVI_MIN_RIGHT_POINTS, SSVI_MIN_ATM_POINTS,
+    SSVI_ATM_BAND, SSVI_FALLBACK_N,
+)
+
 
 # =============================================================================
 # 1. Parametric term-structure functions
@@ -126,9 +133,15 @@ def prepare_ssvi_surface(
     min_iv: float        = 0.03,
     max_iv: float        = 2.00,
     min_tte: float       = 14 / 365,
-    min_moneyness: float = -0.30,
-    max_moneyness: float =  0.20,
     max_liquidity: float =  0.30,
+    delta_short:  float  = SSVI_DELTA_SHORT,
+    delta_long:   float  = SSVI_DELTA_LONG,
+    delta_decay:  float  = SSVI_DELTA_DECAY,
+    min_left_points:  int   = SSVI_MIN_LEFT_POINTS,
+    min_right_points: int   = SSVI_MIN_RIGHT_POINTS,
+    min_atm_points:   int   = SSVI_MIN_ATM_POINTS,
+    atm_band:         float = SSVI_ATM_BAND,
+    n_fallback:       int   = SSVI_FALLBACK_N,
 ) -> pd.DataFrame:
     """Extract and clean the full IV surface for one date.
 
@@ -145,8 +158,12 @@ def prepare_ssvi_surface(
     2. Drop NaN / Inf in critical columns
     3. IV in [min_iv, max_iv]
     4. TTE >= min_tte
-    5. Moneyness (or forward_moneyness) in [min_moneyness, max_moneyness]
-    6. Liquidity Factor <= max_liquidity (skipped if column absent)
+    5. Liquidity Factor <= max_liquidity (skipped if column absent)
+    6. Side-aware delta butterfly filter with balance enforcement
+       (see ``filter_delta_butterfly_continuous``)
+
+    The slice carries the delta-filter balance diagnostics in ``.attrs``:
+    ``n_left_put_otm``, ``n_right_call_otm``, ``n_atm``, ``flag_unbalanced_smile``.
 
     Raises
     ------
@@ -169,10 +186,22 @@ def prepare_ssvi_surface(
     sl = sl.replace([np.inf, -np.inf], np.nan).dropna(subset=[k_col, "TTE", iv_col])
     sl = sl[(sl[iv_col] >= min_iv) & (sl[iv_col] <= max_iv)]
     sl = sl[sl["TTE"] >= min_tte]
-    sl = sl[(sl[k_col] >= min_moneyness) & (sl[k_col] <= max_moneyness)]
 
     if "Liquidity Factor" in sl.columns:
         sl = sl[sl["Liquidity Factor"].fillna(np.inf) <= max_liquidity]
+
+    sl = sl.reset_index(drop=True)
+
+    balance_attrs = dict(n_left_put_otm=0, n_right_call_otm=0, n_atm=0,
+                         flag_unbalanced_smile=True)
+    if len(sl) > 0:
+        sl = filter_delta_butterfly_continuous(
+            sl,
+            delta_short=delta_short, delta_long=delta_long, decay=delta_decay,
+            min_left_points=min_left_points, min_right_points=min_right_points,
+            min_atm_points=min_atm_points, atm_band=atm_band, n_fallback=n_fallback,
+        )
+        balance_attrs = {k: sl.attrs.get(k, v) for k, v in balance_attrs.items()}
 
     sl = sl.reset_index(drop=True)
 
@@ -187,6 +216,7 @@ def prepare_ssvi_surface(
     if iv_col != "implied_vol":
         sl["implied_vol"] = sl[iv_col]
 
+    sl.attrs.update(balance_attrs)
     return sl
 
 
@@ -318,9 +348,15 @@ def calibrate_ssvi_surface(
     min_iv: float        = 0.03,
     max_iv: float        = 2.00,
     min_tte: float       = 14 / 365,
-    min_moneyness: float = -0.30,
-    max_moneyness: float =  0.20,
     max_liquidity: float =  0.30,
+    delta_short:  float  = SSVI_DELTA_SHORT,
+    delta_long:   float  = SSVI_DELTA_LONG,
+    delta_decay:  float  = SSVI_DELTA_DECAY,
+    min_left_points:  int   = SSVI_MIN_LEFT_POINTS,
+    min_right_points: int   = SSVI_MIN_RIGHT_POINTS,
+    min_atm_points:   int   = SSVI_MIN_ATM_POINTS,
+    atm_band:         float = SSVI_ATM_BAND,
+    n_fallback:       int   = SSVI_FALLBACK_N,
     use_arbitrage_penalty: bool = False,
 ) -> dict:
     """Calibrate the 5-parameter SSVI surface for one date.
@@ -330,7 +366,9 @@ def calibrate_ssvi_surface(
     dict with keys:
         time_elapsed, alpha, beta, rho, eta, gamma,
         success, cost, rmse_w, rmse_iv, mae_iv, n_obs,
-        tte_range, moneyness_range, message
+        tte_range, moneyness_range,
+        n_left_put_otm, n_right_call_otm, n_atm, flag_unbalanced_smile,
+        message
     """
     base = dict(
         time_elapsed=time_elapsed,
@@ -338,6 +376,7 @@ def calibrate_ssvi_surface(
         success=False, cost=np.nan,
         rmse_w=np.nan, rmse_iv=np.nan, mae_iv=np.nan,
         n_obs=0, tte_range=(np.nan, np.nan), moneyness_range=(np.nan, np.nan),
+        n_left_put_otm=0, n_right_call_otm=0, n_atm=0, flag_unbalanced_smile=True,
         message="",
     )
 
@@ -346,8 +385,10 @@ def calibrate_ssvi_surface(
         sl = prepare_ssvi_surface(
             df, time_elapsed,
             min_obs=min_obs, min_iv=min_iv, max_iv=max_iv,
-            min_tte=min_tte, min_moneyness=min_moneyness,
-            max_moneyness=max_moneyness, max_liquidity=max_liquidity,
+            min_tte=min_tte, max_liquidity=max_liquidity,
+            delta_short=delta_short, delta_long=delta_long, delta_decay=delta_decay,
+            min_left_points=min_left_points, min_right_points=min_right_points,
+            min_atm_points=min_atm_points, atm_band=atm_band, n_fallback=n_fallback,
         )
     except (ValueError, KeyError) as exc:
         base["message"] = str(exc)
@@ -360,6 +401,10 @@ def calibrate_ssvi_surface(
     base["n_obs"]           = len(sl)
     base["tte_range"]       = (float(T.min()), float(T.max()))
     base["moneyness_range"] = (float(k.min()), float(k.max()))
+    base["n_left_put_otm"]        = sl.attrs.get("n_left_put_otm", 0)
+    base["n_right_call_otm"]      = sl.attrs.get("n_right_call_otm", 0)
+    base["n_atm"]                 = sl.attrs.get("n_atm", 0)
+    base["flag_unbalanced_smile"] = sl.attrs.get("flag_unbalanced_smile", True)
 
     # ── 2. Weights ────────────────────────────────────────────────────────────
     weights = build_weights(sl) if use_weights else None
@@ -403,6 +448,10 @@ def calibrate_ssvi_surface(
         n_obs=len(sl),
         tte_range=(float(T.min()), float(T.max())),
         moneyness_range=(float(k.min()), float(k.max())),
+        n_left_put_otm=base["n_left_put_otm"],
+        n_right_call_otm=base["n_right_call_otm"],
+        n_atm=base["n_atm"],
+        flag_unbalanced_smile=base["flag_unbalanced_smile"],
         message=opt.message,
     )
 
@@ -632,9 +681,15 @@ def calibrate_all_dates(
     min_iv: float        = 0.03,
     max_iv: float        = 2.00,
     min_tte: float       = 14 / 365,
-    min_moneyness: float = -0.30,
-    max_moneyness: float =  0.20,
     max_liquidity: float =  0.30,
+    delta_short:  float  = SSVI_DELTA_SHORT,
+    delta_long:   float  = SSVI_DELTA_LONG,
+    delta_decay:  float  = SSVI_DELTA_DECAY,
+    min_left_points:  int   = SSVI_MIN_LEFT_POINTS,
+    min_right_points: int   = SSVI_MIN_RIGHT_POINTS,
+    min_atm_points:   int   = SSVI_MIN_ATM_POINTS,
+    atm_band:         float = SSVI_ATM_BAND,
+    n_fallback:       int   = SSVI_FALLBACK_N,
     use_arbitrage_penalty: bool = False,
 ) -> pd.DataFrame:
     """Calibrate the parametric SSVI surface for every date in the dataset.
@@ -651,7 +706,9 @@ def calibrate_all_dates(
     DataFrame with one row per date, columns:
         time_elapsed, alpha, beta, rho, eta, gamma,
         success, cost, rmse_w, rmse_iv, mae_iv,
-        n_obs, tte_range, moneyness_range, message
+        n_obs, tte_range, moneyness_range,
+        n_left_put_otm, n_right_call_otm, n_atm, flag_unbalanced_smile,
+        message
     """
     dates = sorted(df["Time Elapsed"].unique())
     n     = len(dates)
@@ -665,9 +722,15 @@ def calibrate_all_dates(
             min_iv                = min_iv,
             max_iv                = max_iv,
             min_tte               = min_tte,
-            min_moneyness         = min_moneyness,
-            max_moneyness         = max_moneyness,
             max_liquidity         = max_liquidity,
+            delta_short           = delta_short,
+            delta_long            = delta_long,
+            delta_decay           = delta_decay,
+            min_left_points       = min_left_points,
+            min_right_points      = min_right_points,
+            min_atm_points        = min_atm_points,
+            atm_band              = atm_band,
+            n_fallback            = n_fallback,
             use_arbitrage_penalty = use_arbitrage_penalty,
         )
 
