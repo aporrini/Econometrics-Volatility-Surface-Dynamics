@@ -108,7 +108,7 @@ We regress Black-76 IV on option structural features (forward moneyness $k$, TTE
 
 **Data window.** 2,632 obs; train 2,105 / test 527 (chronological split).
 
-**ARMA / ARMAX.** BIC over ARMA(p,q), $p,q\in\{0,1,2,3\}$, selects α→ARMA(1,0) and β/ρ/η/γ→ARMA(1,1). Across **all 10 series** (5 levels + 5 differences) the OOS **MSE-ratio = 1.0000** and **$R^2_\text{OOS}$ = 0.0000**: *no* ARMA model beats the random walk. Adding exogenous VIX (ARMAX) does not help — despite in-sample Granger significance of Δlog(VIX) for α and β (p ≈ 0.017–0.028), the signal does not survive OOS. This is the fingerprint of an efficiently-priced surface at the single-lag level. *(A long-memory HAR extension does recover predictable structure in the differenced parameters; see §3.6.)*
+**ARMA / ARMAX.** BIC over ARMA(p,q), $p,q\in\{0,1,2,3\}$, selects α→ARMA(1,0) and β/ρ/η/γ→ARMA(1,1). Across **all 10 series** (5 levels + 5 differences) the OOS **MSE-ratio = 1.0000** and **$R^2_\text{OOS}$ = 0.0000**: *no* ARMA model beats the random walk. Adding exogenous VIX (ARMAX) does not help — despite in-sample Granger significance of Δlog(VIX) for α and β (p ≈ 0.017–0.028), the signal does not survive OOS. This is the fingerprint of an efficiently-priced surface at the single-lag level. *(A long-memory HAR extension on the differenced parameters does recover predictable structure for one of the five — γ; see §3.6.)*
 
 **VAR(2) + VECM (technique #6).** A BIC-optimal VAR(2) on the five-parameter system likewise fails to beat the random walk for four of five parameters; **only γ** attains a marginal OOS gain (MSE-ratio = **0.938**). Cross-parameter dynamics add essentially nothing at h = 1, consistent with the ARMA result.
 
@@ -150,15 +150,17 @@ The engine is **portable** (it uses only the asset's own calibrated surface) and
 
 #### (b) Other findings
 
-- **HAR recovers structure in the SSVI parameters.** Where ARMA/ARMAX/VAR all match the random walk (§3.4), a HAR(1,5,22) on the *differenced* parameters beats both the random walk and ARMA for all five series (R²_OOS = 0.51–0.67; strongest for γ at 0.666). Echoing Corsi (2009) and Andrès et al. (2025), the parameter changes are not structureless — their predictability is long-memory and spread across many lags (so a low-order AR misses it), which the HAR's weekly/monthly aggregates capture.
+- **HAR on the SSVI parameters: genuine predictability is confined to γ.** A HAR(1,5,22) on the *differenced* parameters beats both the random walk and ARMA for all five series (R²_OOS = 0.51–0.67 vs. random walk; strongest for γ at 0.666). The differenced parameters carry *negative* lag-1 autocorrelation (−0.09 to −0.36, bid-ask-bounce-like mean reversion), so we also compare HAR against the **expanding historical mean** (a trivial constant forecast) to separate genuine multi-horizon structure from simple shrinkage toward the mean:
 
-  | Series | HAR MSE-ratio | HAR R²_OOS | ARMA MSE-ratio |
-  |--------|---------------|------------|----------------|
-  | d_alpha | 0.4336 | 0.5664 | 1.0000 |
-  | d_beta  | 0.4494 | 0.5506 | 1.0000 |
-  | d_rho   | 0.4908 | 0.5092 | 1.0000 |
-  | d_eta   | 0.4358 | 0.5642 | 1.0000 |
-  | d_gamma | 0.3339 | **0.6661** | 1.0000 |
+  | Series | HAR R²_OOS (vs RW) | Constant-mean R²_OOS (vs RW) | HAR R²_OOS (vs constant-mean) |
+  |--------|--------------------|------------------------------|-------------------------------|
+  | d_alpha | 0.5664 | 0.5709 | −0.0105 |
+  | d_beta  | 0.5506 | 0.5534 | −0.0064 |
+  | d_rho   | 0.5092 | 0.5331 | −0.0511 |
+  | d_eta   | 0.5642 | 0.5700 | −0.0135 |
+  | d_gamma | 0.6661 | 0.6223 | **+0.1162** |
+
+  The constant-mean forecast alone already reaches R²_OOS = 0.53–0.57 vs. random walk — essentially matching HAR for α, β, ρ, η, where HAR adds nothing on top of it (R²_OOS vs constant-mean is slightly negative). **γ is the sole exception**, genuinely beating the constant-mean benchmark (+0.12) — consistent with its stronger persistence and structural-break profile (S2 Chow tests, rolling-Johansen). So the multi-horizon memory that HAR is built to exploit survives only for γ; for α, β, ρ, η, daily innovations are essentially unpredictable beyond their own mean — a finding consistent with the efficiently-priced, near-martingale surface documented throughout this section.
 
 - **PCA / regimes (brief).** PCA on surface *changes* gives PC1 = 92.7% (common shift), and a HAR on the PC scores returns negative R²_OOS (−0.004/−0.020/−0.008), consistent with the efficient-surface reading. A 3-state HMM on ΔIV identifies low/mid/high-vol regimes (24%/25%/50% of days); supplementary notebook S2 adds Chow break tests (Volmageddon 2018, COVID 2020), CUSUM stability and Granger-causality checks.
 
@@ -176,7 +178,7 @@ The engine is **portable** (it uses only the asset's own calibrated surface) and
 
 The project's central empirical result is **negative with informational content**: a single asset's structurally rich, arbitrage-free SSVI surface does *not* improve on a parsimonious HAR model for realized-volatility forecasting (every option-augmented model is significantly worse OOS, DM up to −3.59\*\*\*), and at the daily frequency the surface behaves like a near-efficiently-priced, near-martingale object — ARMA, ARMAX and VAR all match the random walk. This directly answers our first research aim: the asset-agnostic ambition of replacing the SPX-specific VIX with portable, option-implied regime features is *viable but not superior* on this sample — the leading portable model (F3_ATM) converges to HAR in calm windows but cannot beat it through the COVID-19 shock. That HAR wins is itself the economically meaningful finding: backward-looking long-memory structure, not forward-looking surface geometry, is what carries short-horizon RV predictability here.
 
-The second aim delivers the project's main operational contribution: extending **Avellaneda & Stoikov (2008)** to the full implied-volatility surface, an SSVI-based residual-risk add-on with a √T-calibrated term structure (R² = 0.949) lifts ES₉₅ coverage from **57.3%** (baseline) to **95.9%** — a portable, deployable surface-quoting-and-risk tool that uses only the asset's own options. Around these two contributions sit three supporting results: a fully arbitrage-free SSVI calibration database (2,633 daily surfaces, 95.1% success); a panel decomposition showing 86% of IV cross-sectional variation (96% with Surface-Cell FE) is explained by moneyness, maturity and day effects — SSVI supplies shape, not signal; and the one positive predictability finding, that the *differenced* SSVI parameters carry long-memory (HAR) structure (R²_OOS up to 0.67) invisible to ARMA. Every core econometric technique is exercised on the data, and the two extensions place the standard toolbox inside a genuine quantitative-finance application.
+The second aim delivers the project's main operational contribution: extending **Avellaneda & Stoikov (2008)** to the full implied-volatility surface, an SSVI-based residual-risk add-on with a √T-calibrated term structure (R² = 0.949) lifts ES₉₅ coverage from **57.3%** (baseline) to **95.9%** — a portable, deployable surface-quoting-and-risk tool that uses only the asset's own options. Around these two contributions sit three supporting results: a fully arbitrage-free SSVI calibration database (2,633 daily surfaces, 95.1% success); a panel decomposition showing 86% of IV cross-sectional variation (96% with Surface-Cell FE) is explained by moneyness, maturity and day effects — SSVI supplies shape, not signal; and a single narrow positive predictability result: the *differenced* curvature/wing-decay parameter γ alone carries genuine HAR-exploitable long memory (R²_OOS = 0.67 vs. random walk, and +0.12 vs. a constant-mean forecast) invisible to ARMA, while the other four parameters' innovations are essentially unpredictable beyond their own mean. Every core econometric technique is exercised on the data, and the two extensions place the standard toolbox inside a genuine quantitative-finance application.
 
 ---
 

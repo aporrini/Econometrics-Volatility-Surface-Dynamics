@@ -92,17 +92,17 @@ Sections: Data loading → EDA → Pooled OLS → Day FE → Day + Maturity FE �
 
 - **ARMAX OOS:** Same result — MSE-ratio = 1.0000 for all. Despite Granger significance of Δlog(VIX) for α and β (p≈0.017–0.028), the exogenous signal does not translate to OOS improvement.
 
-- **HAR OOS (Section 3b) — the key positive result for this notebook:** a HAR(1,5,22) model on the *differenced* parameters achieves **R²_OOS = 0.51–0.67** (MSE-ratio 0.33–0.49) for **all five series**, beating both the random walk and ARMA:
+- **HAR OOS (Section 3b):** a HAR(1,5,22) model on the *differenced* parameters achieves **R²_OOS = 0.51–0.67** vs. the random-walk baseline (MSE-ratio 0.33–0.49) for all five series — beating both the random walk and ARMA. The differenced parameters have *negative* lag-1 autocorrelation (−0.09 to −0.36, bid-ask-bounce-like mean reversion), so a second comparison — HAR against the **expanding historical mean** (a trivial constant forecast) — pins down how much of that edge is genuine multi-horizon structure rather than simple shrinkage toward the mean:
 
-  | Series | HAR MSE-ratio | HAR R²_OOS | Beats RW | Beats ARMA |
-  |--------|---------------|------------|----------|------------|
-  | d_alpha | 0.4336 | 0.5664 | ✓ | ✓ |
-  | d_beta | 0.4494 | 0.5506 | ✓ | ✓ |
-  | d_rho | 0.4908 | 0.5092 | ✓ | ✓ |
-  | d_eta | 0.4358 | 0.5642 | ✓ | ✓ |
-  | d_gamma | 0.3339 | 0.6661 | ✓ | ✓ |
+  | Series | HAR R²_OOS (vs RW) | Constant-mean R²_OOS (vs RW) | HAR R²_OOS (vs constant-mean) | Beats constant-mean? |
+  |--------|--------------------|------------------------------|-------------------------------|----------------------|
+  | d_alpha | 0.5664 | 0.5709 | **−0.0105** | ✗ |
+  | d_beta | 0.5506 | 0.5534 | **−0.0064** | ✗ |
+  | d_rho | 0.5092 | 0.5331 | **−0.0511** | ✗ |
+  | d_eta | 0.5642 | 0.5700 | **−0.0135** | ✗ |
+  | d_gamma | 0.6661 | 0.6223 | **+0.1162** | ✓ |
 
-  This shows the SSVI parameter changes are **not** a pure random walk: short-memory ARMA simply cannot see their structure, while a long-memory, multi-horizon HAR model — the same mechanism Corsi (2009) used for realized volatility — recovers it cleanly.
+  The constant-mean forecast alone already reaches R²_OOS = 0.53–0.57 vs. random walk — essentially matching HAR for α, β, ρ, η, where HAR adds **nothing** on top of it (R²_OOS vs constant-mean is slightly *negative*). **γ is the sole exception**: HAR genuinely beats the constant-mean forecast (+0.12), consistent with γ's stronger persistence and structural-break profile (S2 Chow tests, rolling-Johansen). So the Andrès et al. (2025)-inspired hypothesis — that multi-horizon history of the parameters predicts their own future innovations — **survives only for γ**; for α, β, ρ, η, daily innovations are essentially unpredictable beyond their own mean, which is exactly what an efficiently-priced, near-martingale surface (Section 7) would predict.
 
 - **VAR(2) OOS:** Mostly MSE > 1. Only γ achieves MSE-ratio = **0.938** (beats RW slightly).
 
@@ -120,6 +120,8 @@ Sections: Data loading → EDA → Pooled OLS → Day FE → Day + Maturity FE �
 `econometric_analysis/C_realized_volatility_forecasting.ipynb`
 
 **Data:** 2,671 obs (2010-05-25 to 2020-12-31). Train: ~2,136 obs (through 2018-11-14). Test: 534 obs (2018-11-15 to 2020-12-30).
+
+It is well known that HAR augmented with the VIX outperforms plain HAR for S&P 500 realized-volatility forecasting — but the VIX is an SPX-specific input. This notebook asks a more **portable** question: can a single underlying's *own* option surface (its SSVI levels, ATM IV, and nonlinear stress interactions) supply the same regime information, in a form that generalizes to *any* asset with a liquid, tradable option market? The SSVI-augmented models (F3_ATM, M4_smooth, M4+int) are this VIX-free, surface-only alternative.
 
 Targets $y_t^{(h)} = \frac{1}{h}\sum_{i=1}^h \log\text{RV}_{t+i}$ for $h \in \{1, 5, 20\}$. Evaluation: R²_OOS vs Naive; DM-HLN test (HAC Newey-West + HLN small-sample correction).
 
@@ -175,6 +177,8 @@ In the expanding window, HAR+VIX is the marginal winner but DM is not significan
 
 ### Notebook D — SSVI Surface Risk Add-on Engine
 `econometric_analysis/D_ssvi_surface_risk_addon.ipynb`
+
+A market-making risk engine that **extends the Avellaneda & Stoikov (2008) optimal-quoting framework** from a single ATM-volatility input to the full SSVI implied-volatility surface. The baseline `spread_AS` reservation-price/inventory-risk quote (driven by one scalar volatility) systematically under-covers realised surface moves; the notebook adds an **SSVI-based residual-risk add-on** calibrated from the cross-section of strikes and maturities, producing `spread_final`.
 
 **Data:** 2,633 trading days, 45-point IV grid (9 strikes × 5 maturities). Split: 70/15/15 chronological (no shuffle). surface_move: mean = 0.00583 vol-units, std = 0.00798.
 
@@ -285,11 +289,12 @@ finding about the data pipeline itself:
 
 ## References
 
-- Gatheral, J. & Jacquier, A. (2014). Arbitrage-free SVI volatility surfaces. *Quantitative Finance*, 14(1), 59–71.
-- Corsi, F. (2009). A simple approximate long-memory model of realized volatility. *JFEC*, 7(2), 174–196.
 - Andersen, T., Bollerslev, T., Diebold, F. & Labys, P. (2003). Modeling and forecasting realized volatility. *Econometrica*, 71(2), 579–625.
-- Johansen, S. (1991). Estimation and hypothesis testing of cointegration vectors in Gaussian VAR models. *Econometrica*, 59(6), 1551–1580.
-- Engle, R. & Granger, C. (1987). Co-integration and error correction. *Econometrica*, 55(2), 251–276.
-- Diebold, F. & Mariano, R. (1995). Comparing predictive accuracy. *JBES*, 13(3), 253–263.
-- Andrès, H., Boumezoued, A. & Jourdain, B. (2025). The implied volatility surface (also) is path-dependent. arXiv.
-- Heston, S. (1993). A closed-form solution for options with stochastic volatility. *RFS*, 6(2), 327–343.
+- Andrès, H., Boumezoued, A. & Jourdain, B. (2025). The implied volatility surface (also) is path-dependent. *arXiv preprint*.
+- Avellaneda, M. & Stoikov, S. (2008). High-frequency trading in a limit order book. *Quantitative Finance*, 8(3), 217–224.
+- Bollerslev, T. (1986). Generalized autoregressive conditional heteroskedasticity. *Journal of Econometrics*, 31(3), 307–327.
+- Corsi, F. (2009). A simple approximate long-memory model of realized volatility. *Journal of Financial Econometrics*, 7(2), 174–196.
+- Diebold, F. & Mariano, R. (1995). Comparing predictive accuracy. *Journal of Business & Economic Statistics*, 13(3), 253–263.
+- Engle, R. & Granger, C. (1987). Co-integration and error correction: representation, estimation, and testing. *Econometrica*, 55(2), 251–276.
+- Gatheral, J. & Jacquier, A. (2014). Arbitrage-free SVI volatility surfaces. *Quantitative Finance*, 14(1), 59–71.
+- Johansen, S. (1991). Estimation and hypothesis testing of cointegration vectors in Gaussian vector autoregressive models. *Econometrica*, 59(6), 1551–1580.
