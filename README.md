@@ -65,7 +65,7 @@ Sections: Data loading → EDA → Pooled OLS → Day FE → Day + Maturity FE �
 ### Notebook B — SSVI Parameter Dynamics
 `econometric_analysis/B_ssvi_parameter_dynamics.ipynb`
 
-**Data:** 2,632 obs (2010–2025). Train: 2,105 obs (through 2022-06-17). Test: 527 obs (2022–2025).
+**Data:** 2,632 obs (2010-04-15 → 2020-12-31); train 2,105 / test 527 (chronological 80/20 split).
 
 **Sections:**
 
@@ -88,29 +88,31 @@ Sections: Data loading → EDA → Pooled OLS → Day FE → Day + Maturity FE �
 
 - **Stationarity:** All 5 level parameters show conflicting ADF (I(0)) vs KPSS (non-stationary) → classified "Uncertain". First differences are clean I(0). Full parameter descriptives: α mean=−3.45, β mean=1.19, ρ mean=−0.77, η mean=0.75, γ mean=0.54.
 
-- **ARMA OOS (all series):** MSE-ratio = **1.0000**, R²_OOS = **0.0000** across all 10 series. No ARMA specification beats the random walk. BIC-selected orders: α→ARMA(1,0), β/ρ/η/γ→ARMA(1,1).
+- **ARMA OOS:** on the *levels* the surface is essentially unforecastable: only γ beats the random walk (MSE-ratio **0.838**), α and β sit on it (0.998–1.000), and ρ, η are *worse* than it (1.03–1.13 — estimation noise exceeds any signal). On the *differences*, ARMA posts MSE-ratios of **0.32–0.53** vs the "tomorrow's change = today's change" baseline — but most of that edge is a weak-baseline artefact (see the HAR section below). BIC orders: levels α(1,0), β/ρ/γ(1,1), η(2,1); differences ARMA(1,1) everywhere except d_gamma → MA(1).
 
-- **ARMAX OOS:** Same result — MSE-ratio = 1.0000 for all. Despite Granger significance of Δlog(VIX) for α and β (p≈0.017–0.028), the exogenous signal does not translate to OOS improvement.
+- **ARMAX OOS:** Granger pre-screening (train set only) selects `d_log_vix` and `rmse_iv` (p = 0.0001–0.005 across the differenced parameters), but the exogenous block changes nothing OOS: ARMAX matches ARMA to the third decimal on every series (gain ≤ −0.003). The VIX carries no incremental next-day information for the parameter innovations.
 
-- **HAR OOS (Section 3b):** a HAR(1,5,22) model on the *differenced* parameters achieves **R²_OOS = 0.51–0.67** vs. the random-walk baseline (MSE-ratio 0.33–0.49) for all five series — beating both the random walk and ARMA. The differenced parameters have *negative* lag-1 autocorrelation (−0.09 to −0.36, bid-ask-bounce-like mean reversion), so a second comparison — HAR against the **expanding historical mean** (a trivial constant forecast) — pins down how much of that edge is genuine multi-horizon structure rather than simple shrinkage toward the mean:
+- **HAR OOS (Section 3b):** a HAR(1,5,22) model on the *differenced* parameters achieves **R²_OOS = 0.51–0.67** vs. the random-walk baseline (MSE-ratio 0.33–0.49) for all five series. The differenced parameters have *negative* lag-1 autocorrelation (−0.09 to −0.36, bid-ask-bounce-like mean reversion), so two further comparisons pin down how much of that edge is genuine: HAR against the **expanding historical mean** (a trivial constant forecast, with a Diebold-Mariano test), and HAR against the corrected ARMA of Section 2:
 
-  | Series | HAR R²_OOS (vs RW) | Constant-mean R²_OOS (vs RW) | HAR R²_OOS (vs constant-mean) | Beats constant-mean? |
-  |--------|--------------------|------------------------------|-------------------------------|----------------------|
-  | d_alpha | 0.5664 | 0.5709 | **−0.0105** | ✗ |
-  | d_beta | 0.5506 | 0.5534 | **−0.0064** | ✗ |
-  | d_rho | 0.5092 | 0.5331 | **−0.0511** | ✗ |
-  | d_eta | 0.5642 | 0.5700 | **−0.0135** | ✗ |
-  | d_gamma | 0.6661 | 0.6223 | **+0.1162** | ✓ |
+  | Series | HAR R²_OOS (vs RW) | Constant-mean R²_OOS (vs RW) | HAR R²_OOS (vs constant-mean) | DM (p) | ARMA MSE-ratio |
+  |--------|--------------------|------------------------------|-------------------------------|--------|----------------|
+  | d_alpha | 0.5664 | 0.5709 | **−0.0105** | −0.71 (0.48) | 0.4272 |
+  | d_beta | 0.5506 | 0.5534 | **−0.0064** | −0.42 (0.67) | 0.4445 |
+  | d_rho | 0.5092 | 0.5331 | **−0.0511** | −0.80 (0.43) | 0.5254 |
+  | d_eta | 0.5642 | 0.5700 | **−0.0135** | −0.11 (0.91) | 0.4471 |
+  | d_gamma | 0.6661 | 0.6223 | **+0.1162** | +0.64 (0.52) | **0.3166** |
 
-  The constant-mean forecast alone already reaches R²_OOS = 0.53–0.57 vs. random walk — essentially matching HAR for α, β, ρ, η, where HAR adds **nothing** on top of it (R²_OOS vs constant-mean is slightly *negative*). **γ is the sole exception**: HAR genuinely beats the constant-mean forecast (+0.12), consistent with γ's stronger persistence and structural-break profile (S2 Chow tests, rolling-Johansen). So the Andrès et al. (2025)-inspired hypothesis — that multi-horizon history of the parameters predicts their own future innovations — **survives only for γ**; for α, β, ρ, η, daily innovations are essentially unpredictable beyond their own mean, which is exactly what an efficiently-priced, near-martingale surface (Section 7) would predict.
+  The constant-mean forecast alone already reaches R²_OOS = 0.53–0.62 vs. random walk — essentially matching HAR for α, β, ρ, η, where HAR adds **nothing** on top of it. **γ is the partial exception**: HAR beats the constant mean by +0.12 in R²_OOS terms, but the DM test cannot distinguish that edge from noise (p = 0.52), and the plain MA(1) of Section 2 (ratio 0.3166) matches or beats HAR (0.3339) anyway — γ's predictability is **one-lag mean-reversion, not multi-horizon memory**. So the Andrès et al. (2025)-inspired hypothesis — that multi-horizon history of the parameters predicts their own future innovations — finds **no support beyond short-memory dynamics**: daily innovations are essentially unpredictable beyond their own mean, exactly what an efficiently-priced, near-martingale surface (Section 7) would predict.
 
 - **VAR(2) OOS:** Mostly MSE > 1. Only γ achieves MSE-ratio = **0.938** (beats RW slightly).
 
 - **Cointegration (α, η):** full-sample Johansen rank = 2 — *full rank* in a bivariate system, i.e. evidence that both series are individually (near-)stationary rather than jointly tied by a single I(1) long-run attractor (which would instead show up as rank = 1). Engle-Granger still finds a significant long-run linear relationship (p = **0.0002***), but VECM OOS performance is essentially nil: α R²=+0.004 (barely positive), η R²=−0.018 (negative → VECM misspecified for η).
 
-- **Rolling Johansen (500-day windows):** rank = 0 in 2.8%, rank = 1 (genuine single cointegrating vector) in **30.0%**, and rank = 2 (full rank — both series individually stationary) in **67.2%** of windows. The estimated rank — and hence the I(1)/I(0) reading of the system — is itself regime-dependent and correlated with the VIX level (EG calm p=0.0004, EG stress p=0.155).
+- **Rolling Johansen (500-day windows):** rank = 0 in 2.8%, rank = 1 (genuine single cointegrating vector) in **30.0%**, and rank = 2 (full rank — both series individually stationary) in **67.2%** of windows. The estimated rank — and hence the I(1)/I(0) reading of the system — is itself regime-dependent and correlated with the VIX level (EG calm p < 0.0001, EG stress p = 0.067: strong long-run relationship in calm regimes, borderline in stress).
 
 - **PCA on SSVI surface changes (Δω):** 3 PCs explain **99.1%** of variance (PC1=92.69% common daily shock, PC2=4.38% term-structure tilt, PC3=2.04% smile-curvature shock). HAR on these PC scores returns *negative* R²_OOS = **−0.004 / −0.020 / −0.008** at h=1/5/20 — i.e. it underperforms the trivial zero-change (random-walk) baseline at every horizon. This is a clean null result: daily *changes* along the leading principal directions of the surface are near-white-noise, mirroring the near-random-walk behaviour already documented for the individual SSVI parameters (see *Notes on findings* below).
+
+- **Vol-surface reconstruction (Section 8) — the binding test:** every model's parameter forecasts are pushed through the SSVI formula to reconstruct the full surface ω(k,T) on a 15×5 grid and scored on **next-day surface RMSE** — the quantity a quoting desk actually cares about. Nothing beats the sticky (no-change) surface: Uniform ARMA 0.9999×, Uniform VAR 0.9927×, best-per-parameter 1.0133× (*worse* — model-selection noise outweighs the signal). The parameter-space "wins" on the differences are worth at most **0.7%** on the reconstructed surface: the difference models mostly predict the reversal of yesterday's calibration noise, which leaves almost no imprint on the next-day surface.
 
 - **Caching:** Expensive OOS loops cached in `output/cache/`. Set `FORCE_RECOMPUTE = True` to regenerate.
 
@@ -171,7 +173,7 @@ DM convention: positive = model beats HAR, negative = model is worse than HAR.
 
 In the expanding window, HAR+VIX is the marginal winner but DM is not significant (p≈0.26). All SSVI models converge to HAR performance. HAR remains the correct benchmark.
 
-**The bottom line (Section 8):** The realized vol forecasting task at the test period (2018–2020, including COVID-19 with VIX reaching ~83) is extremely difficult due to distributional shift. HAR's parsimony and direct backward-looking structure outperforms richer SSVI-augmented models in OOS. The structural collinearity of SSVI features (VIF analysis) and distributional shift of regime indicators are the two primary obstacles. F3_ATM (portable, VIX-free) comes closest at h=5 with a small DM advantage over HAR.
+**The bottom line (Section 8):** The realized vol forecasting task at the test period (2018–2020, including COVID-19 with VIX reaching ~83) is extremely difficult due to distributional shift. HAR's parsimony and direct backward-looking structure outperforms richer SSVI-augmented models in OOS. The structural collinearity of SSVI features (VIF analysis) and distributional shift of regime indicators are the two primary obstacles. F3_ATM (portable, VIX-free) is the closest surface-only alternative: significantly worse than HAR in the single split (DM = −2.47** at h=5) but statistically indistinguishable from HAR in the expanding window (DM = −0.35) — viable, not superior.
 
 ---
 
@@ -268,22 +270,32 @@ finding about the data pipeline itself:
    practically: it is the point beyond which a wider baseline AS-style quote alone already
    nears the 95% ES coverage target and the HAR-J residual-risk add-on becomes redundant.
 
-4. **A likely date-axis bug in Notebook B (flagged, not fixed).** Notebook B reconstructs
+4. **A date-axis bug in Notebook B (found and fixed).** Notebook B originally reconstructed
    calendar dates from the `time_elapsed` index via `pd.bdate_range(...)[time_elapsed]` —
-   i.e. it treats `time_elapsed` as a *business-day* index — which yields a stated span of
-   **2010–2025** (`SSVI: 2,633 successful calibrations | 2010-05-25 to 2025-05-23`). Notebook D
-   and `src/ssvi_mm_risk_engine.py::load_ssvi_results`, by contrast, treat `time_elapsed` as a
-   **calendar-day** offset (`_SSVI_START + pd.to_timedelta(time_elapsed, unit='D')`), which
-   yields **2010–2020** — consistent with every notebook's own title and with the documented
-   ~2,768-trading-day sample. The two conventions cannot both be right; we left Notebook B's
-   date-handling code untouched (per the "comments/markdown only" review scope) but **the
-   reader should treat Notebook B's absolute calendar-date labels as provisional**. This does
-   not affect any of the reported statistics — train/test splits, rolling windows, and
-   regression results are all defined on the row index, not on the reconstructed calendar date —
-   but the date axis on Notebook B's time-series plots and any "as of [date]" narrative should
-   be read with this caveat in mind. The one-line fix, if pursued, would be to replace the
-   `pd.bdate_range` indexing with the same `_SSVI_START + pd.to_timedelta(time_elapsed, unit='D')`
-   logic used in the risk engine.
+   treating a *calendar-day* offset as a *business-day* index — which stretched the stated
+   span to "2010–2025". Notebook D and `src/ssvi_mm_risk_engine.py::load_ssvi_results`
+   correctly use `START + pd.to_timedelta(time_elapsed, unit='D')`, yielding 2010-04-15 →
+   2020-12-31. This was **not** purely cosmetic: the VIX and yield-curve series (downloaded
+   for 2010–2020) are merged *by date*, so the exogenous regressors of the ARMAX/Granger
+   analyses were misaligned and forward-filled constant over the tail of the sample.
+   Notebook B now uses the calendar-day convention everywhere; all VIX-dependent results
+   (Granger selection, ARMAX, the calm/stress Engle-Granger split in Appendix C) were
+   recomputed with the correctly aligned series.
+
+5. **A silent forecast bug in the rolling ARMA/ARMAX loops (found and fixed).** The
+   original `rolling_arma_oos`/`rolling_armax_oos` fitted statsmodels' ARIMA on a numpy
+   array — for which `.forecast()` returns an *ndarray* — and then read the forecast with
+   `.iloc[0]` (a pandas accessor) inside a bare `except:` that fell back to the last
+   observed value. Every ARMA/ARMAX "forecast" was therefore silently replaced by the
+   random-walk baseline itself, which is why earlier versions reported MSE-ratio = 1.0000
+   *exactly* for all 10 series. With the access fixed (`np.asarray(...)[0]`, plus explicit
+   fallback counters so a silent failure cannot recur), the corrected results are: levels
+   near-unforecastable (only γ at 0.838; ρ/η *worse* than RW), differences at 0.32–0.53
+   vs. the weak last-change baseline — i.e. in line with HAR and the constant mean, not
+   uniquely worse. The headline conclusion (near-martingale surface, sticky at the surface
+   level — Section 8) is unchanged, but the earlier "no ARMA model beats the random walk"
+   phrasing and the "HAR sees structure invisible to ARMA" contrast were artefacts of this
+   bug and have been corrected throughout.
 
 ---
 

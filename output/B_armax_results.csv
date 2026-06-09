@@ -1,6 +1,6 @@
 series,order,MSE_ratio,R2_OOS,DM_stat,DM_p,beats_RW
-d_alpha,"ARMAX(1, 1)",1.0,0.0,,,False
-d_beta,"ARMAX(0, 1)",1.0,0.0,,,False
-d_rho,"ARMAX(3, 0)",1.0,0.0,,,False
-d_eta,"ARMAX(1, 2)",1.0,0.0,,,False
-d_gamma,"ARMAX(0, 1)",1.0,0.0,,,False
+d_alpha,"ARMAX(1, 1)",0.4288,0.5712,-3.4507,0.0006,True
+d_beta,"ARMAX(1, 1)",0.4462,0.5538,-5.2454,0.0,True
+d_rho,"ARMAX(1, 1)",0.5267,0.4733,-3.6165,0.0003,True
+d_eta,"ARMAX(1, 1)",0.4505,0.5495,-3.5446,0.0004,True
+d_gamma,"ARMAX(0, 1)",0.318,0.682,-2.0571,0.0402,True
