@@ -10,3 +10,4 @@ output/*.parquet
 
 # Heavy generated CSV duplicated into Data/ for local notebook use only (>100MB, can't go to GitHub)
 Data/options_with_forward_iv_clean.csv
+__pycache__/
