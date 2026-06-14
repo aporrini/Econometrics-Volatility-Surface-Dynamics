@@ -7,13 +7,18 @@ Authors: Alessio Porrini, Marco Amarilli, Camilla Introzzi, Christian Frigerio
 
 ---
 
-**Abstract.** Using ~1.5 million filtered S&P 500 option quotes (2010–2020), we calibrate a daily arbitrage-free SSVI implied-volatility surface and pursue two aims. First, we ask whether the surface's structural information improves the time-series modelling and forecasting of (i) its own parameters and (ii) realized volatility (RV), relative to standard benchmarks (random walk, HAR) — with the deliberately asset-agnostic twist of testing whether an underlying's *own* option surface can replace the SPX-specific VIX as a regime signal portable to any optionable asset. Second, we extend the Avellaneda & Stoikov (2008) market-making framework to the full surface with an SSVI-based residual-risk add-on calibrated to a target Expected-Shortfall coverage. We deploy the complete econometric toolbox (panel regression with fixed/random effects and hypothesis testing, ARMA/ARMAX, VAR, non-stationarity and cointegration, point and probabilistic forecasting). The central result is *negative with informational content*: option-surface features do not beat parsimonious HAR for RV forecasting through the COVID-19 window, and the surface behaves as a near-efficiently-priced object at the daily frequency. The two original contributions — a portable RV-forecasting study (Notebook C) and a surface market-making risk engine (Notebook D) — are the project's main value beyond the required techniques.
+**Abstract.** Using ~1.5 million filtered S&P 500 option quotes (2010–2020), we calibrate a daily arbitrage-free SSVI implied-volatility surface and ask whether its structural information improves the modelling and forecasting of its own parameters and of realized volatility (RV), relative to random-walk and HAR benchmarks. The central result is *negative with informational content*: a single asset's own option surface does not beat a parsimonious HAR for RV forecasting through the COVID-19 window, and the surface behaves as a near-efficiently-priced object at the daily frequency. We exercise the full course toolbox — panel regression with fixed/random effects and hypothesis testing, ARMA/ARMAX, VAR, non-stationarity and cointegration, and point/probabilistic forecasting — and add two original contributions: a deliberately asset-agnostic (VIX-free) RV-forecasting study (Notebook C) and an Avellaneda & Stoikov (2008) surface market-making risk engine with an SSVI-based, ES₉₅-calibrated residual add-on (Notebook D).
 
 ---
 
 ## 1. Introduction and Literature Review
 
-**Research aims.** The project pursues two connected aims. *(i) Predictive content / market efficiency:* does the structural information in an arbitrage-free IV surface carry incremental out-of-sample (OOS) predictive content for (a) its own future dynamics and (b) future realized volatility, beyond simple benchmarks (random walk, HAR)? A sharpened, deliberately asset-agnostic version of (b) asks whether a single underlying's *own* option surface can supply the regime information usually drawn from the VIX — which is specific to the S&P 500 — in a form that ports to any asset with a liquid option market. *(ii) Risk-management application:* can the **Avellaneda & Stoikov (2008)** optimal market-making framework, which sets quotes for a single instrument, be extended to the full implied-volatility surface with an SSVI-based residual-risk add-on calibrated to a target tail (Expected-Shortfall) coverage? The first aim is the efficient-pricing question; the second turns the surface model into a deployable quoting-and-risk tool.
+**Research aims.** The project pursues two connected research questions:
+
+- **RQ1 — Predictive content / market efficiency.** Does the structural information in an arbitrage-free IV surface carry incremental out-of-sample (OOS) predictive content for (a) its own future dynamics and (b) future realized volatility, beyond simple benchmarks (random walk, HAR)? A sharpened, deliberately asset-agnostic version asks whether a single underlying's *own* option surface can supply the regime information usually drawn from the VIX — specific to the S&P 500 — in a form portable to any asset with a liquid option market.
+- **RQ2 — Risk-management application.** Can the **Avellaneda & Stoikov (2008)** optimal market-making framework, which sets quotes for a single instrument, be extended to the full implied-volatility surface with an SSVI-based residual-risk add-on calibrated to a target tail (Expected-Shortfall) coverage?
+
+The first is the efficient-pricing question; the second turns the surface model into a deployable quoting-and-risk tool.
 
 **Economic framework.** Under efficient option pricing the no-arbitrage IV surface should be close to a martingale at short horizons: if daily surface increments were systematically predictable, a delta-hedged position would extract near risk-free profit, which a functioning market arbitrages away. The competing hypothesis — from the long-memory and path-dependence literature — is that volatility (realized *and* implied) carries persistent, multi-horizon structure that low-order autoregressive models miss but a long-memory model can exploit.
 
@@ -27,16 +32,7 @@ Authors: Alessio Porrini, Marco Amarilli, Camilla Introzzi, Christian Frigerio
 
 **Source and composition.** The raw dataset is a panel of daily **S&P 500 European option** quotes spanning 2010-01-01 → 2020-12-31 (~2,769 trading files; ~3.33 million raw rows), each carrying strike, option type, bid/ask/mid, open interest and time-to-expiry (TTE). Zero-coupon **Treasury rates** (1M, 3M, 6M, 1Y, 2Y, 3Y) and the **VIX** are pulled from FRED; the SPX spot is from Yahoo Finance. The data are processed in three notebooks (`00_data_preparation`, `01_iv_dataset_construction`, `02_ssvi_calibration`).
 
-**Cleaning pipeline (core technique #1).** Quality filters remove illiquid and economically meaningless quotes:
-
-| Filter | Threshold |
-|--------|-----------|
-| Mid price | > \$0.05 |
-| TTE | > 7 days |
-| Bid-ask spread / mid | ≤ 30% |
-| Log-moneyness | ∈ [−0.40, 0.30] |
-
-The implied **forward** is extracted per maturity via put-call parity; Black-76 **implied volatility** is then computed by vectorised Newton-Raphson. The funnel is:
+**Cleaning pipeline (core technique #1).** Quality filters remove illiquid and economically meaningless quotes — mid price > \$0.05, time-to-expiry > 7 days, relative bid-ask spread ≤ 30%, and log-moneyness ∈ [−0.40, 0.30]. The implied **forward** is extracted per maturity via put-call parity; Black-76 **implied volatility** is then computed by vectorised Newton-Raphson. At the calibration stage we apply a further **maturity-dependent delta filter**: far-OTM quotes whose absolute Black-Scholes delta falls below a band tightening from 0.30 at the shortest maturities to 0.05 at the longest ($\Delta_{\min}(T) = 0.05 + 0.25\,e^{-3T}$) are discarded, removing illiquid wings and keeping OTM puts and calls balanced before the arbitrage-free fit. The funnel is:
 
 | Stage | Count |
 |-------|-------|
@@ -51,13 +47,7 @@ The implied **forward** is extracted per maturity via put-call parity; Black-76 
 
 $$\omega(k,\theta) = \frac{\theta}{2}\left\{1 + \rho\,\phi(\theta)\,k + \sqrt{(\phi(\theta)\,k+\rho)^2 + (1-\rho^2)}\right\}, \quad \phi(\theta) = \frac{\eta\,\theta^{-\gamma}}{1+\eta\,\theta^{1-\gamma}}$$
 
-| Parameter | Economic role | Sample mean |
-|-----------|--------------|-------------|
-| α | log(ATM variance) — surface level | −3.45 |
-| β | Term-structure slope | 1.19 |
-| ρ | Skew / leverage effect | −0.77 |
-| η | Vol-of-vol / smile width | 0.75 |
-| γ | Term-structure decay rate | 0.54 |
+The five calibrated parameters carry direct economic readings (sample means in parentheses): **α** = log ATM variance / surface level (−3.45), **β** = term-structure slope (1.19), **ρ** = skew / leverage effect (−0.77), **η** = vol-of-vol / smile width (0.75), **γ** = term-structure decay rate (0.54).
 
 ### 2.3 Econometric toolbox — coverage of the core techniques
 
@@ -100,15 +90,19 @@ We regress Black-76 IV on option structural features (forward moneyness $k$, TTE
 
 **Stationarity.** Each of the five parameter levels gives a *conflicting* ADF (rejects unit root) vs KPSS (rejects stationarity) verdict → classified "uncertain / borderline I(1)"; all five first differences are cleanly I(0). This justifies differencing before ARMA/VAR.
 
-**Cointegration (α, η).** Motivated by the stochastic-volatility coupling of variance level and vol-of-vol, we test the (α, η) pair. The full-sample **Johansen** trace test returns **rank = 2** and **Engle-Granger** gives p = **0.0002\*\*\***. Crucially, in a *bivariate* system rank = 2 is *full rank* — i.e. evidence that **both series are individually (near-)stationary**, not that they are two I(1) series tied by a single long-run attractor (which would instead appear as rank = 1). The VECM is therefore weakly identified OOS: α $R^2$ = +0.004 (barely positive), η $R^2$ = −0.018 (negative).
-
-**Rolling Johansen (500-day windows).** The full-sample reading is itself **regime-dependent**: rank = 0 in 2.8% of windows, **rank = 1 (genuine single cointegrating vector) in 30.0%**, and rank = 2 (full rank) in **67.2%**; the estimated rank tracks the VIX level (EG calm p < 0.0001, EG stress p = 0.067). The α–η relationship is best read as a *structural, regime-conditional* feature of the SSVI parametrisation rather than a stable tradeable spread.
+**Cointegration (α, η).** Testing the variance-level/vol-of-vol pair, the full-sample **Johansen** trace test returns **rank = 2** and **Engle-Granger** gives p = **0.0002\*\*\***. In a *bivariate* system rank = 2 is *full rank* — evidence that both series are individually (near-)stationary, not two I(1) series tied by a single long-run attractor (which would appear as rank = 1); the VECM is correspondingly weak OOS (α $R^2$ = +0.004, η $R^2$ = −0.018). A rolling Johansen (500-day windows) confirms the link is **regime-conditional** — rank = 1 in 30.0% of windows, rank = 2 in 67.2%, with the estimated rank tracking the VIX level — i.e. a structural feature of the SSVI parametrisation rather than a stable tradeable spread.
 
 ### 3.4 ARMA, ARMAX and VAR modelling *(core techniques #4, #6)* — Notebook B
 
 **Data window.** 2,632 obs; train 2,105 / test 527 (chronological split).
 
-**ARMA / ARMAX.** BIC over ARMA(p,q), $p,q\in\{0,1,2,3\}$, selects low orders throughout (levels: α→(1,0), β/ρ/γ→(1,1), η→(2,1); differences: (1,1) everywhere except d_γ→MA(1)). On the **levels** the surface is essentially unforecastable: only γ beats the random walk (MSE-ratio **0.838**), α and β sit on it (0.998–1.000), and ρ, η are *worse* (1.03–1.13) — coefficient-estimation noise exceeds any exploitable signal. On the **differences** every model posts MSE-ratios of 0.32–0.53 against the naïve "tomorrow's change = today's change" baseline, but that apparent edge is mostly mechanical: the differenced parameters are negatively autocorrelated (−0.36 to −0.09), so a trivial expanding-mean forecast alone achieves 0.38–0.47, and ARMA, ARMAX and HAR all land within a whisker of it (§3.6). Adding exogenous regressors (ARMAX) changes nothing: despite train-set Granger significance of Δlog(VIX) and the SSVI fit-RMSE (p = 0.0001–0.005), ARMAX matches ARMA to the third decimal on every series. The **binding evaluation is at the surface level**: recombining each model's parameter forecasts through the SSVI formula into the full surface (15 strikes × 5 maturities) and scoring next-day surface RMSE, *no model improves on the sticky (no-change) surface by more than 0.7%* — ARMA 0.9999×, VAR 0.9927×, best-per-parameter 1.0133× (worse than doing nothing). The parameter-space gains on the differences mostly predict the reversal of yesterday's calibration noise, which leaves no exploitable imprint on the surface a desk actually quotes — the efficient-surface fingerprint where it economically matters.
+**ARMA / ARMAX — order selection and residual diagnostics.** BIC over ARMA(p,q), $p,q\in\{0,1,2,3\}$, selects low orders throughout (levels: α→(1,0), β/ρ/γ→(1,1), η→(2,1); differences: (1,1) everywhere except d_γ→MA(1)). Each fitted ARMA is screened for the iid-residual assumption: a **Ljung-Box** test (lag 10) finds no remaining serial correlation for β, η, γ (levels) and for Δα, Δρ, Δη (differences), while α, ρ, Δβ, Δγ retain mild residual autocorrelation; **ARCH-LM** and **Jarque-Bera** reject homoskedastic and normal residuals throughout. We therefore report HAC standard errors and the AR-GARCH intervals of §3.5 rather than relying on Gaussian OLS inference.
+
+**Levels.** The surface is essentially unforecastable: only γ beats the random walk (MSE-ratio **0.838**), α and β sit on it (0.998–1.000), and ρ, η are *worse* (1.03–1.13) — coefficient-estimation noise exceeds any exploitable signal.
+
+**Differences.** Every model posts MSE-ratios of 0.32–0.53 against the naïve "tomorrow's change = today's change" baseline, but that apparent edge is mostly mechanical: the differenced parameters are negatively autocorrelated (−0.36 to −0.09), so a trivial expanding-mean forecast alone achieves 0.38–0.47, and ARMA, ARMAX and HAR all land within a whisker of it (§3.6). Adding exogenous regressors (ARMAX) changes nothing: despite train-set Granger significance of Δlog(VIX) and the SSVI fit-RMSE (p = 0.0001–0.005), ARMAX matches ARMA to the third decimal on every series.
+
+**Surface-level evaluation (the binding test).** Recombining each model's parameter forecasts through the SSVI formula into the full surface (15 strikes × 5 maturities) and scoring next-day surface RMSE, *no model improves on the sticky (no-change) surface by more than 0.7%* — ARMA 0.9999×, VAR 0.9927×, best-per-parameter 1.0133× (worse than doing nothing). The parameter-space gains on the differences mostly predict the reversal of yesterday's calibration noise, which leaves no exploitable imprint on the surface a desk actually quotes — the efficient-surface fingerprint where it economically matters.
 
 **VAR(2) + VECM (technique #6).** A BIC-optimal VAR(2) on the five-parameter system likewise fails to beat the random walk for four of five parameters; **only γ** attains a marginal OOS gain (MSE-ratio = **0.938**). Cross-parameter dynamics add essentially nothing at h = 1, consistent with the ARMA result.
 
@@ -129,7 +123,15 @@ We regress Black-76 IV on option structural features (forward moneyness $k$, TTE
 | M4_smooth | 9 | 0.449 | 0.819 | −3.59*** | 0.806 | −2.78*** |
 | M4+int | 12 | 0.451 | 0.825 | −2.82*** | 0.817 | −2.13** |
 
+![Figure 2](output/figures/C_forecast_comparison.png)
+
+> **Figure 1.** Out-of-sample realized-volatility forecasts versus realized log-RV through the COVID-19 stress window. Top panels: actual log-RV (black) against the HAR benchmark and the option-augmented M4 specifications at horizons $h=5$ and $h=20$; the vertical marker locates the March-2020 shock (VIX ≈ 83). Bottom panels: corresponding forecast errors. The option-implied models track HAR in calm periods but overshoot during the shock, illustrating HAR's parsimony advantage.
+
 **Outcome.** HAR is the best model: every option-augmented specification is statistically *worse* OOS (DM up to −3.59\*\*\* at h=5), and even the portable F3_ATM trails HAR (−2.47\*\* at h=5). In an **expanding-window** re-evaluation (2016–2020 OOS) all option models converge to HAR performance and HAR+VIX is only nominally best (DM not significant, p ≈ 0.26). The richer models overfit the pre-COVID distribution; HAR's parsimony delivers robustness. The honest, well-identified verdict: a single asset's own option surface carries **no incremental RV-forecasting power beyond HAR** through this stressed window — the portable approach is viable (F3_ATM converges to HAR in calm windows) but not superior on this sample.
+
+![Figure 3](output/figures/C_mse_ratio_bar.png)
+
+> **Figure 2.** Expanding-window out-of-sample MSE of each forecasting model relative to the HAR benchmark (ratio < 1 ⇒ better than HAR), at horizons $h=5$ and $h=20$. Under the expanding-window re-evaluation the option-augmented specifications converge to HAR; only the non-portable HAR+VIX falls nominally below unity, and the gap is not statistically significant. The bars complement the single-split $R^2_\text{OOS}$ of the table above.
 
 **Probabilistic forecasting.** Complementing the point forecasts: AR(1)-GARCH(1,1) (Bollerslev 1986) with QMLE errors produces calibrated **80% prediction intervals** for the SSVI parameter paths (Notebook B), and the risk engine below is evaluated by its **ES₉₅** tail coverage (Notebook D).
 
@@ -146,6 +148,10 @@ We extend the single-instrument optimal market-making model of **Avellaneda & St
 - **Jump robustness.** A bipower-variation jump filter (BPV) flags 29.7% of days — too loose — so a q95+2σ threshold (1.4% jump rate) is selected; the HAR-J jump term does not improve the surface-RV forecast (DM p = 0.290), so jumps are retained only as a robustness check, not a driver.
 - **Sensitivity.** Varying the baseline tightness γ shows a sharp non-linear transition between γ = 1.0 and γ = 2.0 (where `c*` collapses ≈2.2 → ≈0.07): once the baseline quote is wide enough the vol-scaled AS spread alone nears the 95% target and the add-on becomes redundant — identifying the operating regime in which the SSVI add-on actually adds value.
 
+![Figure 4](output/plots/D_cstar_term_structure.png)
+
+> **Figure 3.** Maturity term structure of the calibrated ES₉₅ residual-risk add-on coefficient $c^*(T)$. Left: $c^*$ against maturity $T$ with the fitted decay; right: the same coefficients against $\sqrt{T}$, linearised as $c^*(T) = 4.95 - 3.21\sqrt{T}$ (R² = 0.95). The monotone decline in maturity is consistent with Brownian surface dynamics — short-dated implied-variance moves are larger relative to their long-run mean and require a proportionally wider buffer.
+
 The engine is **portable** (it uses only the asset's own calibrated surface) and turns the SSVI model into a deployable quoting-and-risk tool — the project's most direct operational contribution.
 
 #### (b) Other findings
@@ -160,7 +166,11 @@ The engine is **portable** (it uses only the asset's own calibrated surface) and
   | d_eta   | 0.5642 | 0.5700 | −0.0135 | −0.11 (0.91) | 0.4471 |
   | d_gamma | 0.6661 | 0.6223 | **+0.1162** | +0.64 (0.52) | **0.3166** |
 
-  The constant-mean forecast alone reaches R²_OOS = 0.53–0.62 vs. random walk — essentially matching HAR for α, β, ρ, η, where HAR adds nothing on top of it. **γ is the partial exception**: HAR beats the constant mean by +0.12 in R²_OOS terms, but the DM test cannot distinguish that edge from noise (p = 0.52) and the plain MA(1) of §3.4 (ratio 0.317) matches or beats HAR (0.334) anyway — γ's predictability is *one-lag mean-reversion*, consistent with its stronger persistence and structural-break profile (S2 Chow tests, rolling-Johansen), not multi-horizon memory. The Andrès et al. (2025)-inspired hypothesis that the parameters' own multi-horizon history forecasts their future innovations therefore finds no support beyond short-memory dynamics — a finding consistent with the efficiently-priced, near-martingale surface documented throughout this section, and priced honestly by the surface-level evaluation of §3.4 (no model beats the sticky surface by more than 0.7%).
+  The constant-mean forecast alone reaches R²_OOS = 0.53–0.62 vs. random walk — essentially matching HAR for α, β, ρ, η, where HAR adds nothing on top of it.
+
+  **γ is the partial exception:** HAR beats the constant mean by +0.12 in R²_OOS terms, but the DM test cannot distinguish that edge from noise (p = 0.52) and the plain MA(1) of §3.4 (ratio 0.317) matches or beats HAR (0.334) anyway. γ's predictability is therefore *one-lag mean-reversion*, consistent with its stronger persistence and structural-break profile (S2 Chow tests, rolling-Johansen), not multi-horizon memory.
+
+  The Andrès et al. (2025)-inspired hypothesis — that the parameters' own multi-horizon history forecasts their future innovations — thus finds no support beyond short-memory dynamics, consistent with the efficiently-priced, near-martingale surface documented throughout this section.
 
 - **PCA / regimes (brief).** PCA on surface *changes* gives PC1 = 92.7% (common shift), and a HAR on the PC scores returns negative R²_OOS (−0.004/−0.020/−0.008), consistent with the efficient-surface reading. A 3-state HMM on ΔIV identifies low/mid/high-vol regimes (24%/25%/50% of days); supplementary notebook S2 adds Chow break tests (Volmageddon 2018, COVID 2020), CUSUM stability and Granger-causality checks.
 
@@ -175,9 +185,9 @@ The engine is **portable** (it uses only the asset's own calibrated surface) and
 
 ## 4. Conclusion
 
-The project's central empirical result is **negative with informational content**: a single asset's structurally rich, arbitrage-free SSVI surface does *not* improve on a parsimonious HAR model for realized-volatility forecasting (every option-augmented model is significantly worse OOS, DM up to −3.59\*\*\*), and at the daily frequency the surface behaves like a near-efficiently-priced, near-martingale object — the parameter levels are unforecastable (only γ shows a modest 6–16% MSE gain), the apparent predictability of the parameter *innovations* dissolves against a constant-mean benchmark, and recombining any model's parameter forecasts into the full surface improves next-day surface RMSE by less than 1% over the sticky no-change forecast. This directly answers our first research aim: the asset-agnostic ambition of replacing the SPX-specific VIX with portable, option-implied regime features is *viable but not superior* on this sample — the leading portable model (F3_ATM) converges to HAR in calm windows but cannot beat it through the COVID-19 shock. That HAR wins is itself the economically meaningful finding: backward-looking long-memory structure, not forward-looking surface geometry, is what carries short-horizon RV predictability here.
+The project's central empirical result is **negative with informational content**: a structurally rich, arbitrage-free SSVI surface does *not* improve on a parsimonious HAR for realized-volatility forecasting, and at the daily frequency the surface behaves like a near-efficiently-priced, near-martingale object (§3.4–§3.6). This answers our first research aim: replacing the SPX-specific VIX with portable, option-implied regime features is *viable but not superior* on this sample — the leading portable model (F3_ATM) converges to HAR in calm windows but cannot beat it through the COVID-19 shock. That HAR wins is itself the economically meaningful finding: backward-looking long-memory structure, not forward-looking surface geometry, carries short-horizon RV predictability here.
 
-The second aim delivers the project's main operational contribution: extending **Avellaneda & Stoikov (2008)** to the full implied-volatility surface, an SSVI-based residual-risk add-on with a √T-calibrated term structure (R² = 0.949) lifts ES₉₅ coverage from **57.3%** (baseline) to **95.9%** — a portable, deployable surface-quoting-and-risk tool that uses only the asset's own options. Around these two contributions sit three supporting results: a fully arbitrage-free SSVI calibration database (2,633 daily surfaces, 95.1% success); a panel decomposition showing 86% of IV cross-sectional variation (96% with Surface-Cell FE) is explained by moneyness, maturity and day effects — SSVI supplies shape, not signal; and a single narrow predictability result: the curvature/wing-decay parameter γ alone shows genuine — if modest and statistically fragile — forecastable mean-reversion (MSE-ratio 0.84 in levels; +0.12 R²_OOS over a constant-mean forecast in differences, DM p = 0.52, fully captured by a plain MA(1)), while the other four parameters' innovations are unpredictable beyond their own mean. Every core econometric technique is exercised on the data, and the two extensions place the standard toolbox inside a genuine quantitative-finance application.
+The second aim delivers the main operational contribution: extending **Avellaneda & Stoikov (2008)** to the full implied-volatility surface, an SSVI-based residual-risk add-on with a √T-calibrated term structure (R² = 0.949) raises ES₉₅ coverage to **95.9%** — a portable, deployable quoting-and-risk tool using only the asset's own options. Three supporting results frame these contributions: a fully arbitrage-free SSVI calibration database (2,633 daily surfaces, 95.1% success); a panel decomposition in which moneyness, maturity and day effects explain 86% of IV cross-sectional variation (96% with Surface-Cell FE) — SSVI supplies shape, not signal; and a single narrow predictability result, the wing-decay parameter γ, whose modest mean-reversion is fully captured by a plain MA(1). Every core econometric technique is exercised on the data, and the two extensions embed the standard toolbox in a genuine quantitative-finance application.
 
 ---
 
